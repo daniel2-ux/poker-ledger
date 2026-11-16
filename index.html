@@ -60,12 +60,64 @@ header { display: flex; flex-wrap: wrap; align-items: center; justify-content: s
 h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: .02em; }
 h2 { font-size: 18px; margin: 0; font-weight: 600; text-wrap: balance; }
 .sync { font-size: 13px; color: var(--muted); }
-nav { display: flex; gap: 6px; background: var(--sunk); padding: 5px; border-radius: 999px; }
+main { display: flex; flex-direction: column; gap: 16px; }
+/* Gooey nav: an accent blob slides between tabs and throws off droplets that merge back through an SVG goo filter. */
+nav { position: relative; display: flex; gap: 6px; background: var(--sunk); padding: 5px; border-radius: 999px; }
 nav a {
+  position: relative; z-index: 1;
   padding: 9px 20px; border-radius: 999px; text-decoration: none;
-  color: var(--muted); font-weight: 600; font-size: 16px;
+  color: var(--muted); font-weight: 600; font-size: 16px; transition: color .25s;
 }
-nav a.on { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+nav a.on { color: var(--accent-fg); }
+.goo { position: absolute; inset: 0; filter: url(#goo); pointer-events: none; }
+.blob {
+  position: absolute; border-radius: 999px; background: var(--accent);
+  transition: left .5s cubic-bezier(.5, 1.45, .5, 1), width .5s cubic-bezier(.5, 1.45, .5, 1);
+}
+.blob.still { transition: none; }
+.drop {
+  position: absolute; width: 16px; height: 16px; margin: -8px; border-radius: 50%;
+  background: var(--accent); animation: drop .75s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+@keyframes drop {
+  0% { transform: translate(0, 0) scale(1); }
+  55% { transform: translate(var(--tx), var(--ty)) scale(.9); }
+  100% { transform: translate(calc(var(--tx) * .6), calc(var(--ty) * .6)) scale(0); }
+}
+/* Click sparks on the main actions */
+.sparks { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 50; }
+.sparks i {
+  position: absolute; left: 0; top: -1.5px; width: 14px; height: 3px; border-radius: 2px;
+  background: var(--gold); transform-origin: 0 50%; animation: spark .45s ease-out forwards;
+}
+@keyframes spark {
+  from { transform: rotate(var(--a)) translateX(8px) scaleX(1); opacity: 1; }
+  to { transform: rotate(var(--a)) translateX(34px) scaleX(.15); opacity: 0; }
+}
+/* Staggered entrance when the screen changes */
+.enter .total, .enter .player, .enter .srow, .enter .game, .enter .panel {
+  animation: rise .42s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 45ms);
+}
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+/* Number pop when a value changes */
+.pop { animation: pop .38s cubic-bezier(.3, 1.6, .5, 1); }
+.total b.pop { transform-origin: 0 60%; }
+.hands.pop { transform-origin: 100% 60%; }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
+button { transition: transform .12s ease-out; }
+button:active:not(:disabled) { transform: scale(.95); }
+.banner.ok { position: relative; overflow: hidden; }
+.banner.ok::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, .5) 50%, transparent 65%);
+  animation: shine 1.1s .1s ease-out forwards;
+}
+@keyframes shine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .blob { transition: none; }
+  .enter .total, .enter .player, .enter .srow, .enter .game, .enter .panel, .pop, .banner.ok::after { animation: none; }
+  button:active:not(:disabled) { transform: none; }
+}
 button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; border: 0; border-radius: 12px; background: var(--sunk); padding: 12px 18px; font-weight: 600; min-height: 48px; }
 button:disabled { opacity: .45; cursor: not-allowed; }
@@ -157,6 +209,8 @@ td.num { font-weight: 600; }
       <div class="sync" id="sync"></div>
     </div>
     <nav>
+      <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="goo" x="-60%" y="-150%" width="220%" height="400%"><feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8"/></filter></defs></svg>
+      <div class="goo" id="goo-layer" aria-hidden="true"><span class="blob still" id="blob"></span></div>
       <a href="#game" data-tab="game">牌局</a>
       <a href="#history" data-tab="history">记录</a>
       <a href="#config" data-tab="config">设置</a>
@@ -339,7 +393,7 @@ td.num { font-weight: 600; }
       var key = 'rm:' + i;
       return '<div class="player">' +
         '<div class="name">' + esc(p.name) + '</div>' +
-        '<div class="hands">' + p.hands + '<small>手</small></div>' +
+        '<div class="hands" data-ck="h:' + esc(p.name) + '" data-cv="' + p.hands + '">' + p.hands + '<small>手</small></div>' +
         '<div class="btns">' +
         (rm ? '<button class="minus ' + (ui.arm === key ? 'armed' : 'ghost') + '" data-act="' + key + '" data-confirm="1" aria-label="移除 ' + esc(p.name) + '">' + (ui.arm === key ? '确认移除' : '移除') + '</button>'
           : '<button class="ghost" data-act="dec" data-i="' + i + '" aria-label="' + esc(p.name) + ' 减一手">−1</button>') +
@@ -351,9 +405,9 @@ td.num { font-weight: 600; }
       return '<button class="chip" data-act="join" data-name="' + esc(name) + '">+ ' + esc(name) + '</button>';
     }).join('');
     return '<section class="totals">' +
-      '<div class="total"><b>' + c.totalHands + '</b><span>全场买入手数</span></div>' +
-      '<div class="total"><b>' + trimNum(c.totalBuyPts) + '</b><span>桌上总积分</span></div>' +
-      '<div class="total"><b>¥' + trimNum(c.bank) + '</b><span>Banker 已收</span></div>' +
+      '<div class="total"><b data-ck="t:hands" data-count="" data-cv="' + c.totalHands + '">' + c.totalHands + '</b><span>全场买入手数</span></div>' +
+      '<div class="total"><b data-ck="t:pts" data-count="" data-cv="' + c.totalBuyPts + '">' + trimNum(c.totalBuyPts) + '</b><span>桌上总积分</span></div>' +
+      '<div class="total"><b data-ck="t:bank" data-count="" data-pre="¥" data-cv="' + c.bank + '">¥' + trimNum(c.bank) + '</b><span>Banker 已收</span></div>' +
       '</section>' +
       '<div class="muted">' + fmtDate(cur.startedAt) + ' 开局 · ' + rateLine(cur) + '</div>' +
       '<section class="players">' + rows + '</section>' +
@@ -474,13 +528,83 @@ td.num { font-weight: 600; }
     else if (!S.current) html = vSetup();
     else if (S.current.phase === 'settle') html = vSettle(S.current);
     else html = vPlay(S.current);
+    var key = v + (v === 'game' ? (S.current ? S.current.phase : 'setup') : '');
+    var entering = key !== lastKey && !reduce; lastKey = key;
+    app.className = entering ? 'enter' : '';
     app.innerHTML = html;
+    if (entering) app.querySelectorAll('.total,.player,.srow,.game,.panel').forEach(function (el, i) { el.style.setProperty('--i', Math.min(i, 12)); });
     updateSettle();
+    placeBlob();
+    animateCounts();
     if (aid) {
       var el = document.getElementById(aid);
       if (el) { if (typed !== null) el.value = typed; el.focus({ preventScroll: true }); if (selS !== null) { try { el.setSelectionRange(selS, selS); } catch (e) {} } }
     }
   }
+
+  /* ---------- motion ---------- */
+  var reduce = false;
+  try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  var lastKey = null, lastTab = null, prevVals = {};
+  var navEl = document.querySelector('nav'), blob = document.getElementById('blob'), gooLayer = document.getElementById('goo-layer');
+  function placeBlob() {
+    var a = navEl.querySelector('a.on'); if (!a) return;
+    var first = lastTab === null, changed = lastTab !== a.dataset.tab;
+    if (!first) blob.classList.remove('still');
+    blob.style.left = a.offsetLeft + 'px'; blob.style.top = a.offsetTop + 'px';
+    blob.style.width = a.offsetWidth + 'px'; blob.style.height = a.offsetHeight + 'px';
+    if (changed && !first && !reduce) {
+      var cx = a.offsetLeft + a.offsetWidth / 2, cy = a.offsetTop + a.offsetHeight / 2, w = a.offsetWidth;
+      setTimeout(function () { burst(cx, cy, w); }, 220);
+    }
+    lastTab = a.dataset.tab;
+  }
+  function burst(cx, cy, w) {
+    for (var i = 0; i < 10; i++) {
+      var d = document.createElement('span'), ang = (i / 10) * Math.PI * 2 + Math.random() * .5, dist = 26 + Math.random() * 22;
+      d.className = 'drop';
+      d.style.left = (cx + Math.cos(ang) * w * .3) + 'px'; d.style.top = cy + 'px';
+      d.style.setProperty('--tx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+      d.style.setProperty('--ty', (Math.sin(ang) * dist).toFixed(1) + 'px');
+      d.style.animationDelay = (i * 18) + 'ms';
+      d.addEventListener('animationend', function () { this.remove(); });
+      gooLayer.appendChild(d);
+    }
+  }
+  function spark(x, y) {
+    var box = document.createElement('div'); box.className = 'sparks';
+    box.style.left = x + 'px'; box.style.top = y + 'px';
+    for (var i = 0; i < 8; i++) { var s = document.createElement('i'); s.style.setProperty('--a', (i * 45) + 'deg'); box.appendChild(s); }
+    document.body.appendChild(box);
+    setTimeout(function () { box.remove(); }, 500);
+  }
+  function countTo(el, from, to, pre) {
+    var t0 = null, dur = 450;
+    (function step(t) {
+      if (!el.isConnected) return;
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = pre + trimNum(Math.round(from + (to - from) * e));
+      if (k < 1) requestAnimationFrame(step);
+    })(performance.now());
+  }
+  function animateCounts() {
+    var now = {};
+    app.querySelectorAll('[data-ck]').forEach(function (el) {
+      var k = el.dataset.ck, v = +el.dataset.cv; now[k] = v;
+      if (reduce || !(k in prevVals) || prevVals[k] === v) return;
+      el.classList.add('pop');
+      if (el.dataset.count !== undefined) countTo(el, prevVals[k], v, el.dataset.pre || '');
+    });
+    prevVals = now;
+  }
+  document.addEventListener('pointerdown', function (e) {
+    if (reduce || !e.target.closest) return;
+    var b = e.target.closest('button.primary, button.chip');
+    if (b && !b.disabled) spark(e.clientX, e.clientY);
+  });
+  window.addEventListener('resize', placeBlob);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeBlob);
 
   /* ---------- actions ---------- */
   function addRoster(name) {
