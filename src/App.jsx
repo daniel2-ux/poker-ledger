@@ -5,6 +5,7 @@ import ClickSpark from './reactbits/ClickSpark.jsx';
 import CountUp from './reactbits/CountUp.jsx';
 import ShinyText from './reactbits/ShinyText.jsx';
 import StarBorder from './reactbits/StarBorder.jsx';
+import Starfield from './Starfield.jsx';
 import {
   byNet, calc, cls, fmtDate, loadLocal, newId, norm, round2, saveLocal, signed, sortGames, summaryText, trimNum, validGame
 } from './lib.js';
@@ -12,23 +13,10 @@ import {
 const TABS = ['game', 'history', 'config'];
 const NAV_ITEMS = [{ label: '牌局' }, { label: '记录' }, { label: '设置' }];
 
-// The React Bits components take literal colors, so mirror the CSS tokens per theme here.
+// The React Bits components take literal colors, so mirror the CSS tokens here.
 const PALETTE = {
-  light: { accent: '#1d6a48', accentFg: '#ffffff', gold: '#b07a00', fg: '#14201a', win: '#14774a', shine: '#e2a400' },
   dark: { accent: '#4dbd88', accentFg: '#07130c', gold: '#e8bb52', fg: '#e7efe9', win: '#62d49c', shine: '#ffffff' }
 };
-
-function useDark() {
-  const [dark, setDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
-  useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (!mq) return undefined;
-    const on = e => setDark(e.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  return dark;
-}
 
 function useTab() {
   const read = () => {
@@ -661,8 +649,8 @@ export default function App() {
   const [G, setG] = useState(initial.games);
   const [open, setOpen] = useState(null);
   const tab = useTab();
-  const dark = useDark();
-  const pal = dark ? PALETTE.dark : PALETTE.light;
+  const dark = true; // single dark look, see app.css
+  const pal = PALETTE.dark;
 
   useEffect(() => saveLocal(S, G), [S, G]);
 
@@ -699,6 +687,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
+      <Starfield />
       <ClickSpark sparkColor={pal.gold} sparkCount={10} sparkSize={13} sparkRadius={34} sparkWidth={3} glow={0.5} style={{ minHeight: '100%' }}>
         <div className="wrap">
           <header>

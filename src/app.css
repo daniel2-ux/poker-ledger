@@ -1,25 +1,17 @@
 /* Layout: one centered column for a tablet on the table. Big touch rows, numbers set in a display face, money right-aligned. */
 :root {
-  --bg: #eaf0eb; --surface: #fbfdfb; --sunk: #dfe8e1;
-  --fg: #14201a; --muted: #586960; --line: #cdd9d0;
-  --accent: #1d6a48; --accent-fg: #ffffff; --accent-soft: #d5ebdf;
-  --win: #14774a; --loss: #b4281f; --gold: #8a5c00;
-  --warn-bg: #fbe3df; --ok-bg: #d5ebdf;
+  /* Single dark look: near-black ground so the glint field reads, translucent panels over it. */
+  --bg: #050706; --surface: rgba(21, 28, 24, .8); --sunk: rgba(255, 255, 255, .07);
+  --fg: #eaf1ec; --muted: #9aaaa0; --line: rgba(255, 255, 255, .13);
+  --accent: #4dbd88; --accent-fg: #07130c; --accent-soft: rgba(77, 189, 136, .2);
+  --win: #62d49c; --loss: #ff8c82; --gold: #e8bb52;
+  --warn-bg: rgba(180, 40, 31, .28); --ok-bg: rgba(77, 189, 136, .18);
   --num: "Outfit", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
   --text: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
   --r: 14px;
-  color-scheme: light;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1612; --surface: #17221c; --sunk: #101a15;
-    --fg: #e7efe9; --muted: #97a89e; --line: #2a3a31;
-    --accent: #4dbd88; --accent-fg: #07130c; --accent-soft: #1d3a2c;
-    --win: #62d49c; --loss: #ff8c82; --gold: #e8bb52;
-    --warn-bg: #45201c; --ok-bg: #1d3a2c;
-    color-scheme: dark;
-  }
-}
+.starfield { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 * { box-sizing: border-box; }
 html { height: 100%; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body {
@@ -51,7 +43,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .cta.star-border { width: 100%; min-height: 54px; font-weight: 700; font-size: 18px; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 input[type="text"], input[type="number"], textarea {
-  background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px;
+  background: rgba(0, 0, 0, .35); border: 1.5px solid var(--line); border-radius: 12px;
   padding: 11px 14px; min-height: 48px; min-width: 0; width: 100%;
 }
 textarea { min-height: 120px; font-size: 13px; font-family: ui-monospace, Menlo, monospace; }
