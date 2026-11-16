@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>德州记分板</title>
+<meta name="theme-color" content="#1d6a48">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="德州记分板">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap">
+<style>
+/* Layout: one centered column for a tablet on the table. Big touch rows, numbers set in a display face, money always right-aligned. */
+:root {
+  --bg: #eaf0eb; --surface: #fbfdfb; --sunk: #dfe8e1;
+  --fg: #14201a; --muted: #586960; --line: #cdd9d0;
+  --accent: #1d6a48; --accent-fg: #ffffff; --accent-soft: #d5ebdf;
+  --win: #14774a; --loss: #b4281f; --gold: #8a5c00; --gold-soft: #f6e7bf;
+  --warn-bg: #fbe3df; --ok-bg: #d5ebdf;
+  --num: "Outfit", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --text: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1612; --surface: #17221c; --sunk: #101a15;
+    --fg: #e7efe9; --muted: #97a89e; --line: #2a3a31;
+    --accent: #4dbd88; --accent-fg: #07130c; --accent-soft: #1d3a2c;
+    --win: #62d49c; --loss: #ff8c82; --gold: #e8bb52; --gold-soft: #3a2f12;
+    --warn-bg: #45201c; --ok-bg: #1d3a2c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1612; --surface: #17221c; --sunk: #101a15;
+  --fg: #e7efe9; --muted: #97a89e; --line: #2a3a31;
+  --accent: #4dbd88; --accent-fg: #07130c; --accent-soft: #1d3a2c;
+  --win: #62d49c; --loss: #ff8c82; --gold: #e8bb52; --gold-soft: #3a2f12;
+  --warn-bg: #45201c; --ok-bg: #1d3a2c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--text); font-size: 17px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+h2 { font-size: 18px; margin: 0; font-weight: 600; text-wrap: balance; }
+.sync { font-size: 13px; color: var(--muted); }
+nav { display: flex; gap: 6px; background: var(--sunk); padding: 5px; border-radius: 999px; }
+nav a {
+  padding: 9px 20px; border-radius: 999px; text-decoration: none;
+  color: var(--muted); font-weight: 600; font-size: 16px;
+}
+nav a.on { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; border-radius: 12px; background: var(--sunk); padding: 12px 18px; font-weight: 600; min-height: 48px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-fg); }
+button.ghost { background: transparent; border: 1.5px solid var(--line); }
+button.danger { background: transparent; color: var(--loss); border: 1.5px solid var(--line); }
+button.armed { background: var(--loss); color: #fff; border-color: var(--loss); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+input[type="text"], input[type="number"], textarea {
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 11px 14px; min-height: 48px; min-width: 0; width: 100%;
+}
+textarea { min-height: 120px; font-size: 13px; font-family: ui-monospace, Menlo, monospace; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.row > .grow { flex: 1 1 180px; min-width: 0; }
+.muted { color: var(--muted); font-size: 14px; }
+.num { font-family: var(--num); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border-radius: 999px; padding: 10px 18px; background: var(--sunk); border: 1.5px solid transparent; font-weight: 600; }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
+.chip .x { color: var(--muted); margin-left: 6px; }
+
+.totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.total { background: var(--sunk); border-radius: 12px; padding: 12px 14px; }
+.total b { display: block; font-family: var(--num); font-size: 28px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.total span { font-size: 13px; color: var(--muted); }
+
+.players { display: flex; flex-direction: column; gap: 10px; }
+.player {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px;
+}
+.player .name { font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
+.player .hands { font-family: var(--num); font-size: 34px; font-weight: 700; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.player .hands small { font-family: var(--text); font-size: 14px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+.player .btns { display: flex; gap: 8px; }
+.player .btns button { min-width: 64px; min-height: 60px; font-size: 22px; font-family: var(--num); }
+.player .btns .minus { font-size: 16px; font-family: var(--text); }
+
+.settle { display: flex; flex-direction: column; gap: 10px; }
+.srow {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(110px, .9fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px;
+}
+.srow .name { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }
+.srow input { font-family: var(--num); font-size: 22px; font-weight: 600; text-align: right; }
+.cell { text-align: right; min-width: 0; }
+.cell .lab { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.cell .val { font-family: var(--num); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.cell .sub { font-family: var(--num); font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.win { color: var(--win); } .loss { color: var(--loss); }
+.pay .val { color: var(--gold); }
+@media (max-width: 620px) {
+  .srow { grid-template-columns: 1fr 1fr; }
+  .player { grid-template-columns: minmax(0, 1fr) auto; }
+  .player .btns { grid-column: 1 / -1; }
+  .player .btns button { flex: 1; }
+}
+.banner { border-radius: 12px; padding: 12px 16px; font-weight: 600; }
+.banner.ok { background: var(--ok-bg); color: var(--win); }
+.banner.bad { background: var(--warn-bg); color: var(--loss); }
+.banner.wait { background: var(--sunk); color: var(--muted); }
+
+.game { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.game > button.head { width: 100%; text-align: left; background: transparent; border-radius: 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
+.game .when { font-weight: 600; }
+.game .nets { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 15px; }
+.game .body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.tscroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .04em; }
+th:first-child, td:first-child { text-align: left; }
+td.num { font-weight: 600; }
+.empty { text-align: center; color: var(--muted); padding: 28px 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; flex: 1 1 200px; min-width: 0; }
+.field label { font-size: 14px; color: var(--muted); }
+.toast { font-size: 14px; color: var(--win); min-height: 1.4em; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>德州记分板</h1>
+      <div class="sync" id="sync"></div>
+    </div>
+    <nav>
+      <a href="#game" data-tab="game">牌局</a>
+      <a href="#history" data-tab="history">记录</a>
+      <a href="#config" data-tab="config">设置</a>
+    </nav>
+  </header>
+  <main id="app"></main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var LS = 'poker-ledger-v1';
+  var S = { settings: { handPoints: 1000, handMoney: 200 }, roster: [], current: null };
+  var G = [];
+  var ui = { sel: {}, open: null, arm: null, armTimer: null, exportText: '', toast: '', copyText: '' };
+  var db = null, sync = 'local', dirty = false, writing = false, flushTimer = null;
+  var app = document.getElementById('app');
+
+  /* ---------- helpers ---------- */
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function stable(o) {
+    if (Array.isArray(o)) return '[' + o.map(stable).join(',') + ']';
+    if (o && typeof o === 'object') return '{' + Object.keys(o).sort().map(function (k) { return JSON.stringify(k) + ':' + stable(o[k]); }).join(',') + '}';
+    return JSON.stringify(o === undefined ? null : o);
+  }
+  function norm(d) {
+    d = d || {};
+    var st = d.settings || {};
+    return {
+      settings: { handPoints: +st.handPoints > 0 ? +st.handPoints : 1000, handMoney: +st.handMoney > 0 ? +st.handMoney : 200 },
+      roster: Array.isArray(d.roster) ? d.roster.map(String) : [],
+      current: d.current && Array.isArray(d.current.players) ? clone(d.current) : null
+    };
+  }
+  function newId() { return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function fmtDate(t) { var d = new Date(t); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function trimNum(n) { return (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+  function signed(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + trimNum(Math.abs(n)); }
+  function cls(n) { return n > 0 ? 'win' : n < 0 ? 'loss' : ''; }
+
+  /* ---------- the maths ---------- */
+  // 净利润(积分) = 最终积分 − 手数×一手积分；Banker 应转(元) = 最终积分 ÷ 一手积分 × 一手金额
+  function calc(game) {
+    var hp = game.handPoints, hm = game.handMoney, rate = hm / hp;
+    var rows = game.players.map(function (p) {
+      var filled = typeof p.final === 'number' && isFinite(p.final);
+      var buyPts = p.hands * hp;
+      return {
+        name: p.name, hands: p.hands, final: filled ? p.final : null, filled: filled,
+        buyPts: buyPts, buyMoney: p.hands * hm,
+        netPts: filled ? p.final - buyPts : null,
+        netMoney: filled ? (p.final - buyPts) * rate : null,
+        pay: filled ? p.final * rate : null
+      };
+    });
+    var totalHands = 0, totalFinal = 0, allFilled = rows.length > 0;
+    rows.forEach(function (r) { totalHands += r.hands; if (r.filled) totalFinal += r.final; else allFilled = false; });
+    return {
+      rows: rows, totalHands: totalHands, totalBuyPts: totalHands * hp, bank: totalHands * hm,
+      totalFinal: totalFinal, allFilled: allFilled, diff: totalFinal - totalHands * hp, totalPay: totalFinal * rate
+    };
+  }
+  function summaryText(game) {
+    var c = calc(game);
+    var lines = ['德州结算 ' + fmtDate(game.endedAt || game.startedAt), '一手 ' + trimNum(game.handPoints) + ' 积分 = ' + trimNum(game.handMoney) + ' 元', ''];
+    c.rows.slice().sort(function (a, b) { return (b.netPts || 0) - (a.netPts || 0); }).forEach(function (r) {
+      lines.push(r.name + '：买 ' + r.hands + ' 手，剩 ' + (r.filled ? trimNum(r.final) : '?') +
+        (r.filled ? '，净 ' + signed(r.netPts) + '（' + signed(r.netMoney) + ' 元），Banker 转 ' + trimNum(r.pay) + ' 元' : ''));
+    });
+    lines.push('', '总买入 ' + c.totalHands + ' 手，Banker 共收 ' + trimNum(c.bank) + ' 元，共转出 ' + trimNum(c.totalPay) + ' 元');
+    if (c.allFilled && c.diff !== 0) lines.push('注意：筹码' + (c.diff > 0 ? '多了 ' : '少了 ') + trimNum(Math.abs(c.diff)) + ' 积分');
+    return lines.join('\n');
+  }
+
+  /* ---------- storage ---------- */
+  function loadLocal() {
+    try {
+      var raw = localStorage.getItem(LS);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      S = norm(d.state);
+      G = Array.isArray(d.games) ? d.games : [];
+    } catch (e) {}
+  }
+  function saveLocal() { try { localStorage.setItem(LS, JSON.stringify({ state: S, games: G })); } catch (e) {} }
+  function setSync(v) {
+    sync = v;
+    var t = { local: '数据保存在本机', connecting: '正在连接云端…', synced: '已同步到云端', error: '云端保存失败，数据仍在本机' }[v] || '';
+    document.getElementById('sync').textContent = t;
+  }
+  function commit() { // state changed
+    saveLocal();
+    if (!db) return;
+    dirty = true;
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, 400);
+  }
+  function flush() {
+    if (writing || !dirty || !db) return;
+    writing = true;
+    (function loop() {
+      if (!dirty) { writing = false; return; }
+      dirty = false;
+      db.doc('app/state').set(clone(S)).then(function () { if (sync !== 'synced') setSync('synced'); loop(); },
+        function () { writing = false; setSync('error'); });
+    })();
+  }
+  function sortGames() { G.sort(function (a, b) { return (b.endedAt || 0) - (a.endedAt || 0); }); }
+  function putGame(g) {
+    G = G.filter(function (x) { return x.id !== g.id; }); G.push(g); sortGames(); saveLocal();
+    if (db) db.collection('games').doc(g.id).set(clone(g)).catch(function () { setSync('error'); });
+  }
+  function dropGame(id) {
+    G = G.filter(function (x) { return x.id !== id; }); saveLocal();
+    if (db) db.collection('games').doc(id).delete().catch(function () { setSync('error'); });
+  }
+  function initDb() {
+    if (!window.claude || !window.claude.use) return;
+    setSync('connecting');
+    window.claude.use('db').then(function (d) {
+      if (!d) { setSync('local'); return; }
+      return Promise.all([d.doc('app/state').get(), d.collection('games').get()]).then(function (res) {
+        var ss = res[0], gs = res[1], chain = Promise.resolve();
+        if (!ss.exists && gs.empty) {
+          if (S.roster.length || S.current || G.length) {
+            chain = d.doc('app/state').set(clone(S));
+            G.forEach(function (g) { chain = chain.then(function () { return d.collection('games').doc(g.id).set(clone(g)); }); });
+          }
+        } else {
+          if (ss.exists) S = norm(ss.data());
+          G = gs.docs.map(function (x) { return clone(x.data()); }); sortGames();
+          saveLocal(); render();
+        }
+        return chain.then(function () {
+          db = d; setSync('synced');
+          d.doc('app/state').onSnapshot(function (snap) {
+            if (dirty || writing || snap.metadata.hasPendingWrites || !snap.exists) return;
+            var n = norm(snap.data());
+            if (stable(n) !== stable(S)) { S = n; saveLocal(); render(); }
+          }, function () { setSync('error'); });
+          d.collection('games').onSnapshot(function (snap) {
+            if (snap.metadata.fromCache && snap.empty && G.length) return;
+            var n = snap.docs.map(function (x) { return clone(x.data()); });
+            if (stable(n.map(function (g) { return g.id; }).sort()) === stable(G.map(function (g) { return g.id; }).sort()) && stable(n.length) && n.every(function (g) { return stable(g) === stable(G.filter(function (x) { return x.id === g.id; })[0]); })) return;
+            G = n; sortGames(); saveLocal(); render();
+          }, function () { setSync('error'); });
+        });
+      });
+    }).catch(function () { setSync('local'); });
+  }
+
+  /* ---------- views ---------- */
+  function view() { var h = (location.hash || '').slice(1); return h === 'history' || h === 'config' ? h : 'game'; }
+  function armBtn(key, label, klass) {
+    var on = ui.arm === key;
+    return '<button class="' + (on ? 'armed' : (klass || 'danger')) + '" data-act="' + key + '" data-confirm="1">' + (on ? '再点一次确认' : label) + '</button>';
+  }
+  function rateLine(o) { return '一手 <span class="num">' + trimNum(o.handPoints) + '</span> 积分 = <span class="num">' + trimNum(o.handMoney) + '</span> 元'; }
+
+  function vSetup() {
+    var n = S.roster.filter(function (x) { return ui.sel[x]; }).length;
+    var chips = S.roster.map(function (name) {
+      return '<button class="chip' + (ui.sel[name] ? ' on' : '') + '" data-act="pick" data-name="' + esc(name) + '" aria-pressed="' + (ui.sel[name] ? 'true' : 'false') + '">' + esc(name) + '</button>';
+    }).join('');
+    return '<section class="panel">' +
+      '<h2>开新局</h2>' +
+      '<div class="muted">' + rateLine(S.settings) + '，每人开局自动记 1 手。</div>' +
+      (S.roster.length ? '<div class="muted">点名字选今天上桌的人</div><div class="chips">' + chips + '</div>'
+        : '<div class="empty">还没有玩家。在下面输入名字，添加今天上桌的人，名单会记住，下次直接点选。</div>') +
+      '<form class="row" data-form="addRoster"><input class="grow" id="new-name" type="text" maxlength="12" placeholder="新玩家名字" autocomplete="off"><button type="submit">添加</button></form>' +
+      '<button class="primary" data-act="start"' + (n < 2 ? ' disabled' : '') + '>' + (n < 2 ? '至少选 2 人' : '开始，' + n + ' 人上桌') + '</button>' +
+      '</section>';
+  }
+  function vPlay(cur) {
+    var c = calc(cur);
+    var rows = cur.players.map(function (p, i) {
+      var rm = p.hands <= 1;
+      var key = 'rm:' + i;
+      return '<div class="player">' +
+        '<div class="name">' + esc(p.name) + '</div>' +
+        '<div class="hands">' + p.hands + '<small>手</small></div>' +
+        '<div class="btns">' +
+        (rm ? '<button class="minus ' + (ui.arm === key ? 'armed' : 'ghost') + '" data-act="' + key + '" data-confirm="1" aria-label="移除 ' + esc(p.name) + '">' + (ui.arm === key ? '确认移除' : '移除') + '</button>'
+          : '<button class="ghost" data-act="dec" data-i="' + i + '" aria-label="' + esc(p.name) + ' 减一手">−1</button>') +
+        '<button class="primary" data-act="inc" data-i="' + i + '" aria-label="' + esc(p.name) + ' 加一手">+1</button>' +
+        '</div></div>';
+    }).join('');
+    var inGame = {}; cur.players.forEach(function (p) { inGame[p.name] = 1; });
+    var late = S.roster.filter(function (x) { return !inGame[x]; }).map(function (name) {
+      return '<button class="chip" data-act="join" data-name="' + esc(name) + '">+ ' + esc(name) + '</button>';
+    }).join('');
+    return '<section class="totals">' +
+      '<div class="total"><b>' + c.totalHands + '</b><span>全场买入手数</span></div>' +
+      '<div class="total"><b>' + trimNum(c.totalBuyPts) + '</b><span>桌上总积分</span></div>' +
+      '<div class="total"><b>¥' + trimNum(c.bank) + '</b><span>Banker 已收</span></div>' +
+      '</section>' +
+      '<div class="muted">' + fmtDate(cur.startedAt) + ' 开局 · ' + rateLine(cur) + '</div>' +
+      '<section class="players">' + rows + '</section>' +
+      '<section class="panel"><h2>中途加人</h2>' + (late ? '<div class="chips">' + late + '</div>' : '') +
+      '<form class="row" data-form="joinNew"><input class="grow" id="join-name" type="text" maxlength="12" placeholder="新玩家名字" autocomplete="off"><button type="submit">加入，记 1 手</button></form></section>' +
+      '<div class="row"><button class="primary grow" data-act="toSettle">结束并结算</button>' + armBtn('cancel', '作废本局') + '</div>';
+  }
+  function vSettle(cur) {
+    var rows = cur.players.map(function (p, i) {
+      return '<div class="srow">' +
+        '<div><div class="name">' + esc(p.name) + '</div><div class="muted num">买 ' + p.hands + ' 手 · ¥' + trimNum(p.hands * cur.handMoney) + '</div></div>' +
+        '<div><input id="final-' + i + '" data-final="' + i + '" type="number" inputmode="numeric" min="0" step="1" placeholder="最终积分" aria-label="' + esc(p.name) + ' 最终积分" value="' + (typeof p.final === 'number' ? p.final : '') + '"></div>' +
+        '<div class="cell"><div class="lab">净利润</div><div class="val" id="net-' + i + '">—</div><div class="sub" id="netm-' + i + '"></div></div>' +
+        '<div class="cell pay"><div class="lab">Banker 应转</div><div class="val" id="pay-' + i + '">—</div></div>' +
+        '</div>';
+    }).join('');
+    return '<h2>结算：填每个人最后的积分</h2>' +
+      '<div class="muted">' + rateLine(cur) + '</div>' +
+      '<section class="settle">' + rows + '</section>' +
+      '<div class="banner wait" id="check" role="status"></div>' +
+      '<div class="row"><button class="primary grow" id="save-btn" data-act="save">保存到记录</button>' +
+      '<button class="ghost" data-act="copyCur">复制结算文字</button>' +
+      '<button class="ghost" data-act="back">返回继续打</button></div>' +
+      copyBox();
+  }
+  function copyBox() {
+    return '<div class="toast" role="status">' + esc(ui.toast) + '</div>' +
+      (ui.copyText ? '<textarea id="copy-box" readonly aria-label="结算文字">' + esc(ui.copyText) + '</textarea>' : '');
+  }
+  function updateSettle() {
+    var cur = S.current; if (!cur || cur.phase !== 'settle') return;
+    var c = calc(cur);
+    c.rows.forEach(function (r, i) {
+      var net = document.getElementById('net-' + i), netm = document.getElementById('netm-' + i), pay = document.getElementById('pay-' + i);
+      if (!net) return;
+      net.className = 'val ' + (r.filled ? cls(r.netPts) : '');
+      net.textContent = r.filled ? signed(r.netPts) : '—';
+      netm.textContent = r.filled ? signed(r.netMoney) + ' 元' : '';
+      pay.textContent = r.filled ? '¥' + trimNum(r.pay) : '—';
+    });
+    var check = document.getElementById('check'), btn = document.getElementById('save-btn');
+    if (!c.allFilled) {
+      check.className = 'banner wait';
+      check.textContent = '已填 ' + trimNum(c.totalFinal) + ' / 总买入 ' + trimNum(c.totalBuyPts) + ' 积分，还有人没填';
+      btn.disabled = true; btn.textContent = '保存到记录';
+    } else if (c.diff === 0) {
+      check.className = 'banner ok';
+      check.textContent = '对上了：最终积分合计 ' + trimNum(c.totalFinal) + '，等于总买入。Banker 共转出 ¥' + trimNum(c.totalPay);
+      btn.disabled = false; btn.textContent = '保存到记录';
+    } else {
+      check.className = 'banner bad';
+      check.textContent = '对不上：筹码' + (c.diff > 0 ? '多了 ' : '少了 ') + trimNum(Math.abs(c.diff)) + ' 积分（合计 ' + trimNum(c.totalFinal) + '，总买入 ' + trimNum(c.totalBuyPts) + '）。请重新数一下，或检查买入手数';
+      btn.disabled = false; btn.textContent = '差额照记，仍然保存';
+    }
+  }
+  function gameTable(g) {
+    var c = calc(g);
+    var rows = c.rows.slice().sort(function (a, b) { return (b.netPts || 0) - (a.netPts || 0); }).map(function (r) {
+      return '<tr><td>' + esc(r.name) + '</td><td class="num">' + r.hands + '</td><td class="num">' + trimNum(r.final) + '</td>' +
+        '<td class="num ' + cls(r.netPts) + '">' + signed(r.netPts) + '</td><td class="num ' + cls(r.netPts) + '">' + signed(r.netMoney) + '</td><td class="num">¥' + trimNum(r.pay) + '</td></tr>';
+    }).join('');
+    return '<div class="tscroll"><table><thead><tr><th>玩家</th><th>买入手数</th><th>最终积分</th><th>净利润</th><th>净利润（元）</th><th>Banker 应转</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="muted">' + rateLine(g) + ' · 共 ' + c.totalHands + ' 手 · Banker 收 ¥' + trimNum(c.bank) + '，转出 ¥' + trimNum(c.totalPay) +
+      (c.diff !== 0 ? ' · <span class="loss">筹码' + (c.diff > 0 ? '多 ' : '少 ') + trimNum(Math.abs(c.diff)) + ' 积分</span>' : '') + '</div>';
+  }
+  function vHistory() {
+    if (!G.length) return '<section class="panel"><div class="empty">还没有比赛记录。打完一局并保存结算后，会出现在这里，还会有每个人的累计输赢榜。</div></section>';
+    var tot = {};
+    G.forEach(function (g) {
+      calc(g).rows.forEach(function (r) {
+        var t = tot[r.name] || (tot[r.name] = { name: r.name, money: 0, games: 0 });
+        t.money += r.netMoney || 0; t.games++;
+      });
+    });
+    var board = Object.keys(tot).map(function (k) { return tot[k]; }).sort(function (a, b) { return b.money - a.money; }).map(function (t) {
+      return '<tr><td>' + esc(t.name) + '</td><td class="num">' + t.games + '</td><td class="num ' + cls(t.money) + '">' + signed(t.money) + '</td></tr>';
+    }).join('');
+    var list = G.map(function (g) {
+      var c = calc(g), open = ui.open === g.id;
+      var nets = c.rows.slice().sort(function (a, b) { return (b.netPts || 0) - (a.netPts || 0); }).map(function (r) {
+        return '<span>' + esc(r.name) + ' <b class="num ' + cls(r.netPts) + '">' + signed(r.netPts) + '</b></span>';
+      }).join('');
+      return '<div class="game"><button class="head" data-act="open" data-id="' + g.id + '" aria-expanded="' + open + '">' +
+        '<span class="when num">' + fmtDate(g.endedAt) + ' · ' + g.players.length + ' 人 · ' + c.totalHands + ' 手</span>' +
+        '<span class="nets">' + nets + '</span></button>' +
+        (open ? '<div class="body">' + gameTable(g) + '<div class="row"><button class="ghost" data-act="copyGame" data-id="' + g.id + '">复制结算文字</button>' + armBtn('del:' + g.id, '删除这场记录') + '</div>' + copyBox() + '</div>' : '') +
+        '</div>';
+    }).join('');
+    return '<section class="panel"><h2>累计输赢榜</h2><div class="tscroll"><table><thead><tr><th>玩家</th><th>场数</th><th>累计净利润（元）</th></tr></thead><tbody>' + board + '</tbody></table></div></section>' +
+      '<h2>每场记录</h2>' + list;
+  }
+  function vConfig() {
+    var roster = S.roster.map(function (name) {
+      var key = 'unroster:' + name, on = ui.arm === key;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-act="' + esc(key) + '" data-confirm="1">' + (on ? '确认删除 ' : '') + esc(name) + '<span class="x" aria-hidden="true">×</span></button>';
+    }).join('');
+    return '<section class="panel"><h2>换算比例</h2>' +
+      '<div class="row"><div class="field"><label for="set-points">一手多少积分</label><input id="set-points" data-set="handPoints" type="number" inputmode="numeric" min="1" value="' + S.settings.handPoints + '"></div>' +
+      '<div class="field"><label for="set-money">一手多少元</label><input id="set-money" data-set="handMoney" type="number" inputmode="decimal" min="0" step="any" value="' + S.settings.handMoney + '"></div></div>' +
+      '<div class="muted">修改后只影响之后新开的比赛。进行中的这一局和历史记录保持当时的比例。</div></section>' +
+      '<section class="panel"><h2>常用玩家</h2>' + (roster ? '<div class="muted">点名字两次可从名单里删除，不影响历史记录</div><div class="chips">' + roster + '</div>' : '<div class="muted">名单是空的</div>') +
+      '<form class="row" data-form="addRosterCfg"><input class="grow" id="cfg-name" type="text" maxlength="12" placeholder="新玩家名字" autocomplete="off"><button type="submit">添加</button></form></section>' +
+      '<section class="panel"><h2>备份与恢复</h2>' +
+      '<div class="muted">导出会生成一段文字，复制后存到备忘录或发给自己。恢复时把那段文字粘贴到下面的框里。</div>' +
+      '<div class="row"><button data-act="export">导出全部数据</button></div>' +
+      '<textarea id="backup-box" aria-label="备份数据" placeholder="导出的数据会出现在这里；要恢复时把备份文字粘贴到这里">' + esc(ui.exportText) + '</textarea>' +
+      '<div class="row">' + armBtn('import', '用框里的数据覆盖现有数据') + '</div>' +
+      '<div class="toast" role="status">' + esc(ui.toast) + '</div></section>';
+  }
+
+  function render() {
+    var active = document.activeElement, aid = active && active.id, selS = null, typed = null;
+    if (aid && active.tagName === 'INPUT' && active.type === 'text') { typed = active.value; try { selS = active.selectionStart; } catch (e) {} }
+    var v = view(), html;
+    document.querySelectorAll('nav a').forEach(function (a) { a.className = a.dataset.tab === v ? 'on' : ''; });
+    if (v === 'history') html = vHistory();
+    else if (v === 'config') html = vConfig();
+    else if (!S.current) html = vSetup();
+    else if (S.current.phase === 'settle') html = vSettle(S.current);
+    else html = vPlay(S.current);
+    app.innerHTML = html;
+    updateSettle();
+    if (aid) {
+      var el = document.getElementById(aid);
+      if (el) { if (typed !== null) el.value = typed; el.focus({ preventScroll: true }); if (selS !== null) { try { el.setSelectionRange(selS, selS); } catch (e) {} } }
+    }
+  }
+
+  /* ---------- actions ---------- */
+  function addRoster(name) {
+    name = (name || '').trim();
+    if (!name) return null;
+    if (S.roster.indexOf(name) < 0) S.roster.push(name);
+    return name;
+  }
+  function toast(msg) { ui.toast = msg; }
+  function copy(text) {
+    ui.copyText = text;
+    var done = function () { toast('已复制，可以直接粘贴到群里'); render(); };
+    var fail = function () { toast('自动复制没成功，请长按下面的文字手动复制'); render(); var b = document.getElementById('copy-box'); if (b) { b.focus(); b.select(); } };
+    try { navigator.clipboard.writeText(text).then(done, fail); } catch (e) { fail(); }
+  }
+  function act(key, el) {
+    var cur = S.current, i = +el.dataset.i, name = el.dataset.name;
+    ui.toast = ''; if (key.indexOf('copy') !== 0) ui.copyText = '';
+    if (key === 'pick') { if (ui.sel[name]) delete ui.sel[name]; else ui.sel[name] = 1; }
+    else if (key === 'start') {
+      var names = S.roster.filter(function (x) { return ui.sel[x]; });
+      if (names.length < 2) return;
+      S.current = { id: newId(), startedAt: Date.now(), handPoints: S.settings.handPoints, handMoney: S.settings.handMoney, phase: 'play',
+        players: names.map(function (n) { return { name: n, hands: 1, final: null }; }) };
+      ui.sel = {}; commit();
+    }
+    else if (key === 'inc' && cur) { cur.players[i].hands++; commit(); }
+    else if (key === 'dec' && cur) { if (cur.players[i].hands > 1) cur.players[i].hands--; commit(); }
+    else if (key.indexOf('rm:') === 0 && cur) { cur.players.splice(+key.slice(3), 1); commit(); }
+    else if (key === 'join' && cur) { cur.players.push({ name: name, hands: 1, final: null }); commit(); }
+    else if (key === 'toSettle' && cur) { cur.phase = 'settle'; commit(); }
+    else if (key === 'back' && cur) { cur.phase = 'play'; commit(); }
+    else if (key === 'cancel') { S.current = null; commit(); }
+    else if (key === 'save' && cur) {
+      var c = calc(cur); if (!c.allFilled) return;
+      var g = { id: cur.id, startedAt: cur.startedAt, endedAt: Date.now(), handPoints: cur.handPoints, handMoney: cur.handMoney, diff: c.diff,
+        players: cur.players.map(function (p) { return { name: p.name, hands: p.hands, final: p.final }; }) };
+      putGame(g); S.current = null; commit();
+      ui.open = g.id; location.hash = '#history'; render(); return;
+    }
+    else if (key === 'copyCur' && cur) { copy(summaryText(cur)); return; }
+    else if (key === 'copyGame') { var gg = G.filter(function (x) { return x.id === el.dataset.id; })[0]; if (gg) copy(summaryText(gg)); return; }
+    else if (key === 'open') { ui.open = ui.open === el.dataset.id ? null : el.dataset.id; }
+    else if (key.indexOf('del:') === 0) { dropGame(key.slice(4)); ui.open = null; }
+    else if (key.indexOf('unroster:') === 0) { var nm = key.slice(9); S.roster = S.roster.filter(function (x) { return x !== nm; }); commit(); }
+    else if (key === 'export') {
+      ui.exportText = JSON.stringify({ app: 'poker-ledger', version: 1, exportedAt: Date.now(), state: S, games: G });
+      try { navigator.clipboard.writeText(ui.exportText).then(function () { toast('已复制备份文字，共 ' + G.length + ' 场记录'); render(); }, function () { toast('请长按框里的文字手动复制'); render(); }); } catch (e) { toast('请长按框里的文字手动复制'); }
+    }
+    else if (key === 'import') {
+      var box = document.getElementById('backup-box');
+      try {
+        var d = JSON.parse(box.value);
+        if (!d || !d.state || !Array.isArray(d.games)) throw 0;
+        var old = G.map(function (x) { return x.id; });
+        S = norm(d.state); commit();
+        var keep = {};
+        d.games.forEach(function (g2) { if (g2 && g2.id && Array.isArray(g2.players)) { keep[g2.id] = 1; putGame(g2); } });
+        old.forEach(function (id) { if (!keep[id]) dropGame(id); });
+        ui.exportText = ''; toast('已恢复，共 ' + G.length + ' 场记录');
+      } catch (e) { ui.exportText = box.value; toast('这段文字不是有效的备份，没有改动任何数据'); }
+    }
+    render();
+  }
+
+  app.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
+    var key = el.dataset.act;
+    if (el.dataset.confirm && ui.arm !== key) {
+      if (key === 'import') ui.exportText = document.getElementById('backup-box').value;
+      ui.arm = key; clearTimeout(ui.armTimer);
+      ui.armTimer = setTimeout(function () { ui.arm = null; render(); }, 3500);
+      render(); return;
+    }
+    clearTimeout(ui.armTimer); ui.arm = null;
+    act(key, el);
+  });
+  app.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = e.target.dataset.form, input = e.target.querySelector('input'), name = (input.value || '').trim();
+    if (!name) return;
+    if (f === 'joinNew') {
+      var cur = S.current; if (!cur) return;
+      if (cur.players.some(function (p) { return p.name === name; })) { input.select(); return; }
+      addRoster(name); cur.players.push({ name: name, hands: 1, final: null });
+    } else {
+      addRoster(name); if (f === 'addRoster') ui.sel[name] = 1;
+    }
+    input.value = ''; commit(); render();
+  });
+  app.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.dataset.final !== undefined && S.current) {
+      var v = t.value.trim(), n = v === '' ? null : Math.round(Number(v));
+      S.current.players[+t.dataset.final].final = (n === null || !isFinite(n) || n < 0) ? null : n;
+      commit(); updateSettle();
+    }
+  });
+  app.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.dataset.set) {
+      var n = Number(t.value);
+      if (isFinite(n) && n > 0) { S.settings[t.dataset.set] = n; commit(); ui.toast = '已保存，下一局开始生效'; }
+      else ui.toast = '请输入大于 0 的数字';
+      render();
+    }
+  });
+  window.addEventListener('hashchange', function () { ui.toast = ''; ui.copyText = ''; ui.arm = null; render(); });
+
+  loadLocal(); setSync('local'); render();
+})();
+</script>
+</body>
+</html>
