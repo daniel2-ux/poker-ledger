@@ -5,6 +5,7 @@ import ClickSpark from './reactbits/ClickSpark.jsx';
 import CountUp from './reactbits/CountUp.jsx';
 import ShinyText from './reactbits/ShinyText.jsx';
 import StarBorder from './reactbits/StarBorder.jsx';
+import ElectricBorder from './reactbits/ElectricBorder.jsx';
 import Starfield from './Starfield.jsx';
 import {
   byNet, calc, cls, fmtDate, loadLocal, newId, norm, round2, saveLocal, signed, sortGames, summaryText, trimNum, validGame
@@ -329,6 +330,8 @@ function Settle({ S, setS, onSave, pal, dark }) {
       current: { ...s.current, players: s.current.players.map(p => (p.name === name ? { ...p, final } : p)) }
     }));
   };
+  // Once every stack is in, the biggest winner's row gets the electric border.
+  const top = c.allFilled ? Math.max(...c.rows.map(r => r.netPts)) : 0;
   let banner;
   if (!c.allFilled) {
     banner = (
@@ -386,6 +389,9 @@ function Settle({ S, setS, onSave, pal, dark }) {
               <div className="lab">Banker 应转</div>
               <div className="val">{r.filled ? <Num value={r.pay} prefix="¥" /> : '—'}</div>
             </div>
+            {top > 0 && r.netPts === top ? (
+              <ElectricBorder className="zap" color={pal.gold} borderRadius={14} thickness={1.4} glow={0.7} interactive={false} />
+            ) : null}
           </Rise>
         ))}
       </section>

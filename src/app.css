@@ -87,6 +87,8 @@ textarea { min-height: 120px; font-size: 13px; font-family: ui-monospace, Menlo,
   gap: 12px; align-items: center;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px;
 }
+.srow { position: relative; }
+.srow > .zap { position: absolute; inset: 0; pointer-events: none; }
 .srow .name { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }
 .srow input { font-family: var(--num); font-size: 22px; font-weight: 600; text-align: right; }
 .cell { text-align: right; min-width: 0; }
