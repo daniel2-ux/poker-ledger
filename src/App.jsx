@@ -236,6 +236,17 @@ function Play({ S, setS, pal, dark }) {
     }));
     return true;
   };
+  // Someone leaving early: record their stack now so it is already filled in at settlement.
+  const [cash, setCash] = useState(null); // { name, draft }
+  const cashValue = cash && cash.draft.trim() !== '' ? Math.round(Number(cash.draft)) : NaN;
+  const cashOk = isFinite(cashValue) && cashValue >= 0;
+  const cashOut = () => {
+    if (!cashOk) return;
+    upPlayers(ps => ps.map(p => (p.name === cash.name ? { ...p, final: cashValue, left: true } : p)));
+    setCash(null);
+  };
+  const comeBack = name =>
+    upPlayers(ps => ps.map(p => (p.name === name ? { ...p, final: null, left: false } : p)));
   const late = S.roster.filter(n => !cur.players.some(p => p.name === n));
   return (
     <>
@@ -251,13 +262,20 @@ function Play({ S, setS, pal, dark }) {
             <motion.div
               key={p.name}
               layout
-              className="player"
+              className={'player' + (p.left ? ' left' : '')}
               initial={{ opacity: 0, y: 14, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
               transition={{ delay: Math.min(i, 10) * 0.04, duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
             >
-              <div className="name">{p.name}</div>
+              <div>
+                <div className="name">{p.name}</div>
+                {p.left ? (
+                  <div className="muted num">
+                    已离场 · 带走 {trimNum(p.final)} · 净 <span className={cls(p.final - p.hands * cur.handPoints)}>{signed(p.final - p.hands * cur.handPoints)}</span>
+                  </div>
+                ) : null}
+              </div>
               <div className="hands">
                 <motion.span
                   key={p.hands}
@@ -270,7 +288,32 @@ function Play({ S, setS, pal, dark }) {
                 </motion.span>
                 <small>手</small>
               </div>
+              {cash && cash.name === p.name ? (
+                <form className="btns cash" onSubmit={e => { e.preventDefault(); cashOut(); }}>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    step="1"
+                    autoFocus
+                    placeholder="走时的积分"
+                    aria-label={`${p.name} 离场时的积分`}
+                    value={cash.draft}
+                    onChange={e => setCash({ name: p.name, draft: e.target.value })}
+                  />
+                  <button type="submit" className="btn primary minus" disabled={!cashOk}>确定</button>
+                  <button type="button" className="btn ghost minus" onClick={() => setCash(null)}>取消</button>
+                </form>
+              ) : p.left ? (
+                <div className="btns">
+                  <button type="button" className="btn ghost minus" onClick={() => setCash({ name: p.name, draft: String(p.final) })}>改积分</button>
+                  <button type="button" className="btn ghost minus" onClick={() => comeBack(p.name)}>回到牌桌</button>
+                </div>
+              ) : (
               <div className="btns">
+                <button type="button" className="btn ghost minus" aria-label={`${p.name} 提前离场`} onClick={() => setCash({ name: p.name, draft: '' })}>
+                  离场
+                </button>
                 {p.hands <= 1 ? (
                   <Confirm
                     label="移除"
@@ -288,6 +331,7 @@ function Play({ S, setS, pal, dark }) {
                   +1
                 </motion.button>
               </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
@@ -327,7 +371,7 @@ function Settle({ S, setS, onSave, pal, dark }) {
     const final = n === null || !isFinite(n) || n < 0 ? null : n;
     setS(s => ({
       ...s,
-      current: { ...s.current, players: s.current.players.map(p => (p.name === name ? { ...p, final } : p)) }
+      current: { ...s.current, players: s.current.players.map(p => (p.name === name ? { ...p, final, left: final === null ? false : p.left } : p)) }
     }));
   };
   // Once every stack is in, the biggest winner's row gets the electric border.
@@ -366,7 +410,7 @@ function Settle({ S, setS, onSave, pal, dark }) {
           <Rise key={r.name} i={i} className="srow">
             <div>
               <div className="name">{r.name}</div>
-              <div className="muted num">买 {r.hands} 手 · ¥{trimNum(r.buyMoney)}</div>
+              <div className="muted num">买 {r.hands} 手 · ¥{trimNum(r.buyMoney)}{cur.players[i].left ? ' · 已离场' : ''}</div>
             </div>
             <div>
               <input
@@ -443,8 +487,61 @@ function GameTable({ g }) {
   );
 }
 
+// Fix a wrong number in a saved game: hands and final stack per player.
+function GameEditor({ g, onSave, onCancel }) {
+  const [rows, setRows] = useState(() => g.players.map(p => ({ name: p.name, hands: String(p.hands), final: String(p.final ?? 0) })));
+  const set = (i, key, v) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [key]: v } : r)));
+  const parsed = rows.map(r => ({
+    name: r.name,
+    hands: r.hands.trim() === '' ? NaN : Number(r.hands),
+    final: r.final.trim() === '' ? NaN : Math.round(Number(r.final))
+  }));
+  const ok = parsed.every(p => Number.isInteger(p.hands) && p.hands >= 1 && isFinite(p.final) && p.final >= 0);
+  const c = ok ? calc({ ...g, players: parsed }) : null;
+  return (
+    <>
+      <div className="tscroll">
+        <table className="edit">
+          <thead>
+            <tr><th>玩家</th><th>买入手数</th><th>最终积分</th><th>净利润</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const row = c ? c.rows[i] : null;
+              return (
+                <tr key={r.name}>
+                  <td>{r.name}</td>
+                  <td><input type="number" inputMode="numeric" min="1" step="1" aria-label={`${r.name} 买入手数`} value={r.hands} onChange={e => set(i, 'hands', e.target.value)} /></td>
+                  <td><input type="number" inputMode="numeric" min="0" step="1" aria-label={`${r.name} 最终积分`} value={r.final} onChange={e => set(i, 'final', e.target.value)} /></td>
+                  <td className={'num ' + (row ? cls(row.netPts) : '')}>{row ? signed(row.netPts) : '—'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!ok ? (
+        <div className="banner wait" role="status">手数要是不小于 1 的整数，最终积分不能空着</div>
+      ) : c.diff === 0 ? (
+        <div className="banner ok" role="status">对上了：最终积分合计 {trimNum(c.totalFinal)}，等于总买入</div>
+      ) : (
+        <div className="banner bad" role="status">
+          对不上：筹码{c.diff > 0 ? '多了 ' : '少了 '}{trimNum(Math.abs(c.diff))} 积分（合计 {trimNum(c.totalFinal)}，总买入 {trimNum(c.totalBuyPts)}）
+        </div>
+      )}
+      <div className="row">
+        <button type="button" className="btn primary" disabled={!ok} onClick={() => ok && onSave({ ...g, diff: c.diff, players: parsed })}>
+          保存修改
+        </button>
+        <button type="button" className="btn ghost" onClick={onCancel}>取消</button>
+      </div>
+    </>
+  );
+}
+
 function History({ G, setG, open, setOpen }) {
   const { toast, text, copy } = useCopy();
+  const [editing, setEditing] = useState(null);
   const board = useMemo(() => {
     const tot = {};
     G.forEach(g =>
@@ -515,8 +612,20 @@ function History({ G, setG, open, setOpen }) {
                     transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
                   >
                     <div className="body">
+                      {editing === g.id ? (
+                        <GameEditor
+                          g={g}
+                          onCancel={() => setEditing(null)}
+                          onSave={ng => {
+                            setG(gs => gs.map(x => (x.id === ng.id ? ng : x)));
+                            setEditing(null);
+                          }}
+                        />
+                      ) : (
+                      <>
                       <GameTable g={g} />
                       <div className="row">
+                        <button type="button" className="btn ghost" onClick={() => setEditing(g.id)}>修改数据</button>
                         <button type="button" className="btn ghost" onClick={() => copy(summaryText(g))}>复制结算文字</button>
                         <Confirm
                           label="删除这场记录"
@@ -527,6 +636,8 @@ function History({ G, setG, open, setOpen }) {
                         />
                       </div>
                       <CopyBox toast={toast} text={text} />
+                      </>
+                      )}
                     </div>
                   </motion.div>
                 ) : null}

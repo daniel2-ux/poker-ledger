@@ -81,6 +81,12 @@ textarea { min-height: 120px; font-size: 13px; font-family: ui-monospace, Menlo,
 .player .btns .btn { min-width: 64px; min-height: 60px; font-size: 22px; font-family: var(--num); }
 .player .btns .minus, .player .btns .armed { font-size: 16px; font-family: var(--text); }
 
+.player.left .name, .player.left .hands { opacity: .55; }
+.player .btns.cash { align-items: center; }
+.player .btns.cash input { width: 150px; min-height: 60px; font-family: var(--num); font-size: 20px; font-weight: 600; text-align: right; }
+.player .btns.cash .btn { min-width: 0; }
+table.edit td input { width: 120px; min-height: 44px; padding: 8px 10px; font-family: var(--num); font-weight: 600; text-align: right; }
+
 .settle { display: flex; flex-direction: column; gap: 10px; }
 .srow {
   display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(110px, .9fr) minmax(0, 1fr) minmax(0, 1fr);
@@ -103,6 +109,7 @@ textarea { min-height: 120px; font-size: 13px; font-family: ui-monospace, Menlo,
   .player { grid-template-columns: minmax(0, 1fr) auto; }
   .player .btns { grid-column: 1 / -1; }
   .player .btns .btn { flex: 1; }
+  .player .btns.cash input { flex: 2; width: auto; }
 }
 .banner { border-radius: 12px; padding: 12px 16px; font-weight: 600; }
 .banner.ok { background: var(--ok-bg); color: var(--win); }
