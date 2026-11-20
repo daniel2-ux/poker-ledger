@@ -10,9 +10,9 @@ import Starfield from './Starfield.jsx';
 import {
   byNet, calc, cls, fmtDate, loadLocal, newId, norm, round2, saveLocal, signed, sortGames, summaryText, trimNum, validGame
 } from './lib.js';
+import { L, getLang, setLang } from './i18n.js';
 
 const TABS = ['game', 'history', 'config'];
-const NAV_ITEMS = [{ label: '牌局' }, { label: '记录' }, { label: '设置' }];
 
 // The React Bits components take literal colors, so mirror the CSS tokens here.
 const PALETTE = {
@@ -40,9 +40,9 @@ function useCopy() {
     setText(value);
     try {
       await navigator.clipboard.writeText(value);
-      setToast('已复制，可以直接粘贴到群里');
+      setToast(L().copied);
     } catch (e) {
-      setToast('自动复制没成功，请长按下面的文字手动复制');
+      setToast(L().copyFail);
     }
   }, []);
   return { toast, text, copy };
@@ -76,7 +76,7 @@ function Rise({ i = 0, className, children, ...rest }) {
 }
 
 // Two taps to confirm: the viewer never sees a browser confirm() dialog on a home-screen app.
-function Confirm({ label, armedLabel = '再点一次确认', onConfirm, className = 'btn danger', ...rest }) {
+function Confirm({ label, armedLabel = L().confirmAgain, onConfirm, className = 'btn danger', ...rest }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return undefined;
@@ -123,12 +123,12 @@ function Cta({ pal, dark, children, ...rest }) {
 function Rate({ o }) {
   return (
     <>
-      一手 <span className="num">{trimNum(o.handPoints)}</span> 积分 = <span className="num">{trimNum(o.handMoney)}</span> 元
+      {L().rate[0]}<span className="num">{trimNum(o.handPoints)}</span>{L().rate[1]}<span className="num">{trimNum(o.handMoney)}</span>{L().rate[2]}
     </>
   );
 }
 
-function NameForm({ placeholder = '新玩家名字', button, onAdd }) {
+function NameForm({ placeholder = L().newPlayer, button, onAdd }) {
   const [name, setName] = useState('');
   return (
     <form
@@ -158,7 +158,7 @@ function CopyBox({ toast, text }) {
   return (
     <>
       <div className="toast" role="status">{toast}</div>
-      {text ? <textarea readOnly aria-label="结算文字" value={text} onFocus={e => e.target.select()} /> : null}
+      {text ? <textarea readOnly aria-label={L().summaryAria} value={text} onFocus={e => e.target.select()} /> : null}
     </>
   );
 }
@@ -166,6 +166,7 @@ function CopyBox({ toast, text }) {
 /* ---------- screens ---------- */
 
 function Setup({ S, setS, pal, dark }) {
+  const t = L();
   const [sel, setSel] = useState({});
   const picked = S.roster.filter(n => sel[n]);
   const start = () => {
@@ -184,11 +185,11 @@ function Setup({ S, setS, pal, dark }) {
   };
   return (
     <Rise className="panel">
-      <h2>开新局</h2>
-      <div className="muted"><Rate o={S.settings} />，每人开局自动记 1 手。只发牌的 Dealer 也选上，开局后点「−1」减到 0 手。</div>
+      <h2>{t.newGame}</h2>
+      <div className="muted"><Rate o={S.settings} />{t.setupHint}</div>
       {S.roster.length ? (
         <>
-          <div className="muted">点名字选今天上桌的人</div>
+          <div className="muted">{t.pickHint}</div>
           <div className="chips">
             {S.roster.map(name => (
               <motion.button
@@ -205,23 +206,24 @@ function Setup({ S, setS, pal, dark }) {
           </div>
         </>
       ) : (
-        <div className="empty">还没有玩家。在下面输入名字，添加今天上桌的人，名单会记住，下次直接点选。</div>
+        <div className="empty">{t.noPlayers}</div>
       )}
       <NameForm
-        button="添加"
+        button={t.add}
         onAdd={n => {
           setS(s => (s.roster.includes(n) ? s : { ...s, roster: [...s.roster, n] }));
           setSel(x => ({ ...x, [n]: true }));
         }}
       />
       <Cta pal={pal} dark={dark} disabled={picked.length < 2} onClick={start}>
-        {picked.length < 2 ? '至少选 2 人' : `开始，${picked.length} 人上桌`}
+        {picked.length < 2 ? t.min2 : t.start(picked.length)}
       </Cta>
     </Rise>
   );
 }
 
 function Play({ S, setS, pal, dark }) {
+  const t = L();
   const cur = S.current;
   const c = calc(cur);
   const upPlayers = fn => setS(s => ({ ...s, current: { ...s.current, players: fn(s.current.players) } }));
@@ -251,11 +253,11 @@ function Play({ S, setS, pal, dark }) {
   return (
     <>
       <section className="totals">
-        <Rise i={0} className="total"><b><Num value={c.totalHands} /></b><span>全场买入手数</span></Rise>
-        <Rise i={1} className="total"><b><Num value={c.totalBuyPts} /></b><span>桌上总积分</span></Rise>
-        <Rise i={2} className="total"><b><Num value={c.bank} prefix="¥" /></b><span>Banker 已收</span></Rise>
+        <Rise i={0} className="total"><b><Num value={c.totalHands} /></b><span>{t.totHands}</span></Rise>
+        <Rise i={1} className="total"><b><Num value={c.totalBuyPts} /></b><span>{t.totPts}</span></Rise>
+        <Rise i={2} className="total"><b><Num value={c.bank} prefix="¥" /></b><span>{t.bankIn}</span></Rise>
       </section>
-      <div className="muted">{fmtDate(cur.startedAt)} 开局 · <Rate o={cur} /></div>
+      <div className="muted">{fmtDate(cur.startedAt)}{t.started}<Rate o={cur} /></div>
       <section className="players">
         <AnimatePresence initial={true}>
           {cur.players.map((p, i) => (
@@ -272,10 +274,10 @@ function Play({ S, setS, pal, dark }) {
                 <div className="name">{p.name}</div>
                 {p.left ? (
                   <div className="muted num">
-                    已离场 · 带走 {trimNum(p.final)} · 净 <span className={cls(p.final - p.hands * cur.handPoints)}>{signed(p.final - p.hands * cur.handPoints)}</span>
+                    {t.leftLine[0]}{trimNum(p.final)}{t.leftLine[1]}<span className={cls(p.final - p.hands * cur.handPoints)}>{signed(p.final - p.hands * cur.handPoints)}</span>
                   </div>
                 ) : p.hands === 0 ? (
-                  <div className="muted">Dealer · 只发牌，不买入</div>
+                  <div className="muted">{t.dealerPlay}</div>
                 ) : null}
               </div>
               <div className="hands">
@@ -288,7 +290,7 @@ function Play({ S, setS, pal, dark }) {
                 >
                   {p.hands}
                 </motion.span>
-                <small>手</small>
+                <small>{t.handUnit}</small>
               </div>
               {cash && cash.name === p.name ? (
                 <form className="btns cash" onSubmit={e => { e.preventDefault(); cashOut(); }}>
@@ -298,38 +300,38 @@ function Play({ S, setS, pal, dark }) {
                     min="0"
                     step="1"
                     autoFocus
-                    placeholder="走时的积分"
-                    aria-label={`${p.name} 离场时的积分`}
+                    placeholder={t.cashPh}
+                    aria-label={t.cashAria(p.name)}
                     value={cash.draft}
                     onChange={e => setCash({ name: p.name, draft: e.target.value })}
                   />
-                  <button type="submit" className="btn primary minus" disabled={!cashOk}>确定</button>
-                  <button type="button" className="btn ghost minus" onClick={() => setCash(null)}>取消</button>
+                  <button type="submit" className="btn primary minus" disabled={!cashOk}>{t.ok}</button>
+                  <button type="button" className="btn ghost minus" onClick={() => setCash(null)}>{t.cancel}</button>
                 </form>
               ) : p.left ? (
                 <div className="btns">
-                  <button type="button" className="btn ghost minus" onClick={() => setCash({ name: p.name, draft: String(p.final) })}>改积分</button>
-                  <button type="button" className="btn ghost minus" onClick={() => comeBack(p.name)}>回到牌桌</button>
+                  <button type="button" className="btn ghost minus" onClick={() => setCash({ name: p.name, draft: String(p.final) })}>{t.editChips}</button>
+                  <button type="button" className="btn ghost minus" onClick={() => comeBack(p.name)}>{t.backIn}</button>
                 </div>
               ) : (
               <div className="btns">
-                <button type="button" className="btn ghost minus" aria-label={`${p.name} 提前离场`} onClick={() => setCash({ name: p.name, draft: '' })}>
-                  离场
+                <button type="button" className="btn ghost minus" aria-label={t.leaveAria(p.name)} onClick={() => setCash({ name: p.name, draft: '' })}>
+                  {t.leave}
                 </button>
                 {p.hands <= 0 ? (
                   <Confirm
-                    label="移除"
-                    armedLabel="确认移除"
+                    label={t.remove}
+                    armedLabel={t.removeConfirm}
                     className="btn ghost minus"
-                    aria-label={`移除 ${p.name}`}
+                    aria-label={t.removeAria(p.name)}
                     onConfirm={() => upPlayers(ps => ps.filter(x => x.name !== p.name))}
                   />
                 ) : (
-                  <motion.button type="button" whileTap={{ scale: 0.9 }} className="btn ghost" aria-label={`${p.name} 减一手`} onClick={() => bump(p.name, -1)}>
+                  <motion.button type="button" whileTap={{ scale: 0.9 }} className="btn ghost" aria-label={t.minusAria(p.name)} onClick={() => bump(p.name, -1)}>
                     −1
                   </motion.button>
                 )}
-                <motion.button type="button" whileTap={{ scale: 0.9 }} className="btn primary" aria-label={`${p.name} 加一手`} onClick={() => bump(p.name, 1)}>
+                <motion.button type="button" whileTap={{ scale: 0.9 }} className="btn primary" aria-label={t.plusAria(p.name)} onClick={() => bump(p.name, 1)}>
                   +1
                 </motion.button>
               </div>
@@ -339,7 +341,7 @@ function Play({ S, setS, pal, dark }) {
         </AnimatePresence>
       </section>
       <Rise i={cur.players.length} className="panel">
-        <h2>中途加人</h2>
+        <h2>{t.lateJoin}</h2>
         {late.length ? (
           <div className="chips">
             {late.map(n => (
@@ -349,21 +351,22 @@ function Play({ S, setS, pal, dark }) {
             ))}
           </div>
         ) : null}
-        <NameForm button="加入，记 1 手" onAdd={join} />
+        <NameForm button={t.joinBtn} onAdd={join} />
       </Rise>
       <div className="row">
         <div className="grow">
           <Cta pal={pal} dark={dark} onClick={() => setS(s => ({ ...s, current: { ...s.current, phase: 'settle' } }))}>
-            结束并结算
+            {t.endSettle}
           </Cta>
         </div>
-        <Confirm label="作废本局" onConfirm={() => setS(s => ({ ...s, current: null }))} />
+        <Confirm label={t.voidGame} onConfirm={() => setS(s => ({ ...s, current: null }))} />
       </div>
     </>
   );
 }
 
 function Settle({ S, setS, onSave, pal, dark }) {
+  const t = L();
   const cur = S.current;
   const c = calc(cur);
   const { toast, text, copy } = useCopy();
@@ -382,14 +385,14 @@ function Settle({ S, setS, onSave, pal, dark }) {
   if (!c.allFilled) {
     banner = (
       <div className="banner wait" role="status">
-        已填 {trimNum(c.totalFinal)} / 总买入 {trimNum(c.totalBuyPts)} 积分，还有人没填
+        {t.waitBanner(trimNum(c.totalFinal), trimNum(c.totalBuyPts))}
       </div>
     );
   } else if (c.diff === 0) {
     banner = (
       <motion.div className="banner ok" role="status" initial={{ scale: 0.96 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 14 }}>
         <ShinyText
-          text={`对上了：最终积分合计 ${trimNum(c.totalFinal)}，等于总买入。Banker 共转出 ¥${trimNum(c.totalPay)}`}
+          text={t.okBanner(trimNum(c.totalFinal), trimNum(c.totalPay))}
           color={pal.win}
           shineColor={pal.shine}
           speed={2.5}
@@ -399,20 +402,20 @@ function Settle({ S, setS, onSave, pal, dark }) {
   } else {
     banner = (
       <motion.div className="banner bad" role="status" initial={{ x: -8 }} animate={{ x: 0 }} transition={{ type: 'spring', stiffness: 600, damping: 8 }}>
-        对不上：筹码{c.diff > 0 ? '多了 ' : '少了 '}{trimNum(Math.abs(c.diff))} 积分（合计 {trimNum(c.totalFinal)}，总买入 {trimNum(c.totalBuyPts)}）。请重新数一下，或检查买入手数
+        {t.badBanner(c.diff, trimNum(Math.abs(c.diff)), trimNum(c.totalFinal), trimNum(c.totalBuyPts), true)}
       </motion.div>
     );
   }
   return (
     <>
-      <h2>结算：填每个人最后的积分</h2>
+      <h2>{t.settleTitle}</h2>
       <div className="muted"><Rate o={cur} /></div>
       <section className="settle">
         {c.rows.map((r, i) => (
           <Rise key={r.name} i={i} className="srow">
             <div>
               <div className="name">{r.name}</div>
-              <div className="muted num">{r.hands === 0 ? 'Dealer · 不买入' : <>买 {r.hands} 手 · ¥{trimNum(r.buyMoney)}</>}{cur.players[i].left ? ' · 已离场' : ''}</div>
+              <div className="muted num">{r.hands === 0 ? t.dealerSettle : t.buyLine(r.hands, trimNum(r.buyMoney))}{cur.players[i].left ? t.leftTag : ''}</div>
             </div>
             <div>
               <input
@@ -420,19 +423,19 @@ function Settle({ S, setS, onSave, pal, dark }) {
                 inputMode="numeric"
                 min="0"
                 step="1"
-                placeholder="最终积分"
-                aria-label={`${r.name} 最终积分`}
+                placeholder={t.finalChips}
+                aria-label={t.finalAria(r.name)}
                 value={r.filled ? r.final : ''}
                 onChange={e => setFinal(r.name, e.target.value)}
               />
             </div>
             <div className="cell">
-              <div className="lab">净利润</div>
+              <div className="lab">{t.net}</div>
               <div className={'val ' + (r.filled ? cls(r.netPts) : '')}>{r.filled ? signed(r.netPts) : '—'}</div>
-              <div className="sub">{r.filled ? signed(r.netMoney) + ' 元' : ''}</div>
+              <div className="sub">{r.filled ? t.money(signed(r.netMoney)) : ''}</div>
             </div>
             <div className="cell pay">
-              <div className="lab">Banker 应转</div>
+              <div className="lab">{t.bankerPays}</div>
               <div className="val">{r.filled ? <Num value={r.pay} prefix="¥" /> : '—'}</div>
             </div>
             {top > 0 && r.netPts === top ? (
@@ -445,12 +448,12 @@ function Settle({ S, setS, onSave, pal, dark }) {
       <div className="row">
         <div className="grow">
           <Cta pal={pal} dark={dark} disabled={!c.allFilled} onClick={() => c.allFilled && onSave(cur, c)}>
-            {c.allFilled && c.diff !== 0 ? '差额照记，仍然保存' : '保存到记录'}
+            {c.allFilled && c.diff !== 0 ? t.saveAnyway : t.saveRec}
           </Cta>
         </div>
-        <button type="button" className="btn ghost" onClick={() => copy(summaryText(cur))}>复制结算文字</button>
+        <button type="button" className="btn ghost" onClick={() => copy(summaryText(cur))}>{t.copySummary}</button>
         <button type="button" className="btn ghost" onClick={() => setS(s => ({ ...s, current: { ...s.current, phase: 'play' } }))}>
-          返回继续打
+          {t.keepPlaying}
         </button>
       </div>
       <CopyBox toast={toast} text={text} />
@@ -459,13 +462,14 @@ function Settle({ S, setS, onSave, pal, dark }) {
 }
 
 function GameTable({ g }) {
+  const t = L();
   const c = calc(g);
   return (
     <>
       <div className="tscroll">
         <table>
           <thead>
-            <tr><th>玩家</th><th>买入手数</th><th>最终积分</th><th>净利润</th><th>净利润（元）</th><th>Banker 应转</th></tr>
+            <tr><th>{t.thPlayer}</th><th>{t.thHands}</th><th>{t.finalChips}</th><th>{t.net}</th><th>{t.thNetMoney}</th><th>{t.bankerPays}</th></tr>
           </thead>
           <tbody>
             {byNet(c.rows).map(r => (
@@ -482,8 +486,8 @@ function GameTable({ g }) {
         </table>
       </div>
       <div className="muted">
-        <Rate o={g} /> · 共 {c.totalHands} 手 · Banker 收 ¥{trimNum(c.bank)}，转出 ¥{trimNum(c.totalPay)}
-        {c.diff !== 0 ? <span className="loss"> · 筹码{c.diff > 0 ? '多 ' : '少 '}{trimNum(Math.abs(c.diff))} 积分</span> : null}
+        <Rate o={g} />{t.tableFoot(c.totalHands, trimNum(c.bank), trimNum(c.totalPay))}
+        {c.diff !== 0 ? <span className="loss">{t.diffShort(c.diff, trimNum(Math.abs(c.diff)))}</span> : null}
       </div>
     </>
   );
@@ -491,6 +495,7 @@ function GameTable({ g }) {
 
 // Fix a wrong number in a saved game: hands and final stack per player.
 function GameEditor({ g, onSave, onCancel }) {
+  const t = L();
   const [rows, setRows] = useState(() => g.players.map(p => ({ name: p.name, hands: String(p.hands), final: String(p.final ?? 0) })));
   const set = (i, key, v) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [key]: v } : r)));
   const parsed = rows.map(r => ({
@@ -505,7 +510,7 @@ function GameEditor({ g, onSave, onCancel }) {
       <div className="tscroll">
         <table className="edit">
           <thead>
-            <tr><th>玩家</th><th>买入手数</th><th>最终积分</th><th>净利润</th></tr>
+            <tr><th>{t.thPlayer}</th><th>{t.thHands}</th><th>{t.finalChips}</th><th>{t.net}</th></tr>
           </thead>
           <tbody>
             {rows.map((r, i) => {
@@ -513,8 +518,8 @@ function GameEditor({ g, onSave, onCancel }) {
               return (
                 <tr key={r.name}>
                   <td>{r.name}</td>
-                  <td><input type="number" inputMode="numeric" min="0" step="1" aria-label={`${r.name} 买入手数`} value={r.hands} onChange={e => set(i, 'hands', e.target.value)} /></td>
-                  <td><input type="number" inputMode="numeric" min="0" step="1" aria-label={`${r.name} 最终积分`} value={r.final} onChange={e => set(i, 'final', e.target.value)} /></td>
+                  <td><input type="number" inputMode="numeric" min="0" step="1" aria-label={t.handsAria(r.name)} value={r.hands} onChange={e => set(i, 'hands', e.target.value)} /></td>
+                  <td><input type="number" inputMode="numeric" min="0" step="1" aria-label={t.finalAria(r.name)} value={r.final} onChange={e => set(i, 'final', e.target.value)} /></td>
                   <td className={'num ' + (row ? cls(row.netPts) : '')}>{row ? signed(row.netPts) : '—'}</td>
                 </tr>
               );
@@ -523,25 +528,26 @@ function GameEditor({ g, onSave, onCancel }) {
         </table>
       </div>
       {!ok ? (
-        <div className="banner wait" role="status">手数要是整数（只发牌的 Dealer 填 0），最终积分不能空着</div>
+        <div className="banner wait" role="status">{t.editInvalid}</div>
       ) : c.diff === 0 ? (
-        <div className="banner ok" role="status">对上了：最终积分合计 {trimNum(c.totalFinal)}，等于总买入</div>
+        <div className="banner ok" role="status">{t.editOk(trimNum(c.totalFinal))}</div>
       ) : (
         <div className="banner bad" role="status">
-          对不上：筹码{c.diff > 0 ? '多了 ' : '少了 '}{trimNum(Math.abs(c.diff))} 积分（合计 {trimNum(c.totalFinal)}，总买入 {trimNum(c.totalBuyPts)}）
+          {t.badBanner(c.diff, trimNum(Math.abs(c.diff)), trimNum(c.totalFinal), trimNum(c.totalBuyPts), false)}
         </div>
       )}
       <div className="row">
         <button type="button" className="btn primary" disabled={!ok} onClick={() => ok && onSave({ ...g, diff: c.diff, players: parsed })}>
-          保存修改
+          {t.saveEdit}
         </button>
-        <button type="button" className="btn ghost" onClick={onCancel}>取消</button>
+        <button type="button" className="btn ghost" onClick={onCancel}>{t.cancel}</button>
       </div>
     </>
   );
 }
 
 function History({ G, setG, open, setOpen }) {
+  const t = L();
   const { toast, text, copy } = useCopy();
   const [editing, setEditing] = useState(null);
   const board = useMemo(() => {
@@ -558,17 +564,17 @@ function History({ G, setG, open, setOpen }) {
   if (!G.length) {
     return (
       <Rise className="panel">
-        <div className="empty">还没有比赛记录。打完一局并保存结算后，会出现在这里，还会有每个人的累计输赢榜。</div>
+        <div className="empty">{t.noGames}</div>
       </Rise>
     );
   }
   return (
     <>
       <Rise className="panel">
-        <h2>累计输赢榜</h2>
+        <h2>{t.board}</h2>
         <div className="tscroll">
           <table>
-            <thead><tr><th>玩家</th><th>场数</th><th>累计净利润（元）</th></tr></thead>
+            <thead><tr><th>{t.thPlayer}</th><th>{t.thGames}</th><th>{t.thTotalNet}</th></tr></thead>
             <tbody>
               {board.map(t => (
                 <tr key={t.name}>
@@ -581,7 +587,7 @@ function History({ G, setG, open, setOpen }) {
           </table>
         </div>
       </Rise>
-      <h2>每场记录</h2>
+      <h2>{t.eachGame}</h2>
       <AnimatePresence initial={true}>
         {G.map((g, i) => {
           const c = calc(g);
@@ -597,7 +603,7 @@ function History({ G, setG, open, setOpen }) {
               transition={{ delay: Math.min(i + 1, 10) * 0.045, duration: 0.35 }}
             >
               <button type="button" className="head" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : g.id)}>
-                <span className="when num">{fmtDate(g.endedAt)} · {g.players.length} 人 · {c.totalHands} 手</span>
+                <span className="when num">{fmtDate(g.endedAt)}{t.gameHead(g.players.length, c.totalHands)}</span>
                 <span className="nets">
                   {byNet(c.rows).map(r => (
                     <span key={r.name}>{r.name} <b className={'num ' + cls(r.netPts)}>{signed(r.netPts ?? 0)}</b></span>
@@ -627,10 +633,10 @@ function History({ G, setG, open, setOpen }) {
                       <>
                       <GameTable g={g} />
                       <div className="row">
-                        <button type="button" className="btn ghost" onClick={() => setEditing(g.id)}>修改数据</button>
-                        <button type="button" className="btn ghost" onClick={() => copy(summaryText(g))}>复制结算文字</button>
+                        <button type="button" className="btn ghost" onClick={() => setEditing(g.id)}>{t.editData}</button>
+                        <button type="button" className="btn ghost" onClick={() => copy(summaryText(g))}>{t.copySummary}</button>
                         <Confirm
-                          label="删除这场记录"
+                          label={t.delGame}
                           onConfirm={() => {
                             setOpen(null);
                             setG(gs => gs.filter(x => x.id !== g.id));
@@ -680,22 +686,23 @@ function SettingNumber({ id, label, value, onCommit, decimal }) {
 }
 
 function Config({ S, setS, G, setG }) {
+  const t = L();
   const [toast, setToast] = useState('');
   const [box, setBox] = useState('');
   const setSetting = key => n => {
-    if (n === null) return setToast('请输入大于 0 的数字');
+    if (n === null) return setToast(t.needPositive);
     if (n === S.settings[key]) return undefined;
     setS(s => ({ ...s, settings: { ...s.settings, [key]: n } }));
-    return setToast('已保存，下一局开始生效');
+    return setToast(t.savedNext);
   };
   const exportAll = async () => {
     const text = JSON.stringify({ app: 'poker-ledger', version: 1, exportedAt: Date.now(), state: S, games: G });
     setBox(text);
     try {
       await navigator.clipboard.writeText(text);
-      setToast(`已复制备份文字，共 ${G.length} 场记录`);
+      setToast(t.exported(G.length));
     } catch (e) {
-      setToast('请长按框里的文字手动复制');
+      setToast(t.longPress);
     }
   };
   const importAll = () => {
@@ -706,54 +713,54 @@ function Config({ S, setS, G, setG }) {
       setS(norm(d.state));
       setG(games);
       setBox('');
-      setToast(`已恢复，共 ${games.length} 场记录`);
+      setToast(t.restored(games.length));
     } catch (e) {
-      setToast('这段文字不是有效的备份，没有改动任何数据');
+      setToast(t.badBackup);
     }
   };
   return (
     <>
       <Rise i={0} className="panel">
-        <h2>换算比例</h2>
+        <h2>{t.ratio}</h2>
         <div className="row">
-          <SettingNumber id="set-points" label="一手多少积分" value={S.settings.handPoints} onCommit={setSetting('handPoints')} />
-          <SettingNumber id="set-money" label="一手多少元" value={S.settings.handMoney} onCommit={setSetting('handMoney')} decimal />
+          <SettingNumber id="set-points" label={t.ptsPer} value={S.settings.handPoints} onCommit={setSetting('handPoints')} />
+          <SettingNumber id="set-money" label={t.moneyPer} value={S.settings.handMoney} onCommit={setSetting('handMoney')} decimal />
         </div>
-        <div className="muted">修改后只影响之后新开的比赛。进行中的这一局和历史记录保持当时的比例。</div>
+        <div className="muted">{t.ratioHint}</div>
       </Rise>
       <Rise i={1} className="panel">
-        <h2>常用玩家</h2>
+        <h2>{t.roster}</h2>
         {S.roster.length ? (
           <>
-            <div className="muted">点名字两次可从名单里删除，不影响历史记录</div>
+            <div className="muted">{t.rosterHint}</div>
             <div className="chips">
               {S.roster.map(name => (
                 <Confirm
                   key={name}
                   className="chip"
                   label={<>{name}<span className="x" aria-hidden="true">×</span></>}
-                  armedLabel={`确认删除 ${name}`}
+                  armedLabel={t.delName(name)}
                   onConfirm={() => setS(s => ({ ...s, roster: s.roster.filter(x => x !== name) }))}
                 />
               ))}
             </div>
           </>
         ) : (
-          <div className="muted">名单是空的</div>
+          <div className="muted">{t.rosterEmpty}</div>
         )}
-        <NameForm button="添加" onAdd={n => setS(s => (s.roster.includes(n) ? s : { ...s, roster: [...s.roster, n] }))} />
+        <NameForm button={t.add} onAdd={n => setS(s => (s.roster.includes(n) ? s : { ...s, roster: [...s.roster, n] }))} />
       </Rise>
       <Rise i={2} className="panel">
-        <h2>备份与恢复</h2>
-        <div className="muted">导出会生成一段文字，复制后存到备忘录或发给自己。恢复时把那段文字粘贴到下面的框里。</div>
-        <div className="row"><button type="button" className="btn" onClick={exportAll}>导出全部数据</button></div>
+        <h2>{t.backup}</h2>
+        <div className="muted">{t.backupHint}</div>
+        <div className="row"><button type="button" className="btn" onClick={exportAll}>{t.exportAll}</button></div>
         <textarea
-          aria-label="备份数据"
-          placeholder="导出的数据会出现在这里；要恢复时把备份文字粘贴到这里"
+          aria-label={t.backupAria}
+          placeholder={t.backupPh}
           value={box}
           onChange={e => setBox(e.target.value)}
         />
-        <div className="row"><Confirm label="用框里的数据覆盖现有数据" onConfirm={importAll} /></div>
+        <div className="row"><Confirm label={t.overwrite} onConfirm={importAll} /></div>
         <div className="toast" role="status">{toast}</div>
       </Rise>
     </>
@@ -768,6 +775,17 @@ export default function App() {
   const [G, setG] = useState(initial.games);
   const [open, setOpen] = useState(null);
   const tab = useTab();
+  const [lang, setLangState] = useState(getLang);
+  const t = L();
+  useEffect(() => {
+    document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+    document.title = t.title;
+  }, [lang, t]);
+  const toggleLang = () => {
+    const next = lang === 'en' ? 'zh' : 'en';
+    setLang(next);
+    setLangState(next);
+  };
   const dark = true; // single dark look, see app.css
   const pal = PALETTE.dark;
 
@@ -811,11 +829,14 @@ export default function App() {
         <div className="wrap">
           <header>
             <div>
-              <h1><ShinyText text="德州记分板" color={pal.fg} shineColor={pal.shine} speed={3} delay={2} /></h1>
-              <div className="sync">数据保存在本机</div>
+              <h1><ShinyText key={lang} text={t.title} color={pal.fg} shineColor={pal.shine} speed={3} delay={2} /></h1>
+              <div className="sync">{t.local}</div>
             </div>
+            <div className="head-right">
+            <button type="button" className="btn ghost lang" aria-label={t.switchAria} onClick={toggleLang}>{t.switchTo}</button>
             <GooeyNav
-              items={NAV_ITEMS}
+              key={lang}
+              items={t.nav.map(label => ({ label }))}
               activeIndex={TABS.indexOf(tab)}
               onChange={i => { window.location.hash = '#' + TABS[i]; }}
               theme={dark ? 'dark' : 'light'}
@@ -823,8 +844,9 @@ export default function App() {
               activeTextColor={pal.accentFg}
               size="lg"
             />
+            </div>
           </header>
-          <main key={screenKey}>{screen}</main>
+          <main key={screenKey + lang}>{screen}</main>
         </div>
       </ClickSpark>
     </MotionConfig>

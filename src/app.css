@@ -28,6 +28,8 @@ main { display: flex; flex-direction: column; gap: 16px; }
 header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: .02em; }
 h2 { font-size: 18px; margin: 0; font-weight: 600; text-wrap: balance; }
+.head-right { display: flex; align-items: center; gap: 10px; }
+.btn.lang { min-height: 40px; padding: 6px 14px; font-size: 14px; border-radius: 999px; }
 .sync { font-size: 13px; color: var(--muted); }
 
 button, input, textarea { font: inherit; color: inherit; }

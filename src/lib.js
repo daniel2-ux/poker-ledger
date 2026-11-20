@@ -1,5 +1,7 @@
 // Pure logic: formatting, the settlement maths, and local storage.
 
+import { L } from './i18n.js';
+
 export const LS_KEY = 'poker-ledger-v1';
 
 export const DEFAULT_STATE = { settings: { handPoints: 1000, handMoney: 200 }, roster: [], current: null };
@@ -78,21 +80,20 @@ export const byNet = rows => rows.slice().sort((a, b) => (b.netPts || 0) - (a.ne
 
 export function summaryText(game) {
   const c = calc(game);
+  const t = L();
   const lines = [
-    '德州结算 ' + fmtDate(game.endedAt || game.startedAt),
-    `一手 ${trimNum(game.handPoints)} 积分 = ${trimNum(game.handMoney)} 元`,
+    t.sumTitle + fmtDate(game.endedAt || game.startedAt),
+    t.sumRate(trimNum(game.handPoints), trimNum(game.handMoney)),
     ''
   ];
   byNet(c.rows).forEach(r => {
     lines.push(
-      `${r.name}：买 ${r.hands} 手，剩 ${r.filled ? trimNum(r.final) : '?'}` +
-        (r.filled ? `，净 ${signed(r.netPts)}（${signed(r.netMoney)} 元），Banker 转 ${trimNum(r.pay)} 元` : '')
+      t.sumRow(r.name, r.hands, r.filled ? trimNum(r.final) : '?') +
+        (r.filled ? t.sumRowNet(signed(r.netPts), signed(r.netMoney), trimNum(r.pay)) : '')
     );
   });
-  lines.push('', `总买入 ${c.totalHands} 手，Banker 共收 ${trimNum(c.bank)} 元，共转出 ${trimNum(c.totalPay)} 元`);
-  if (c.allFilled && c.diff !== 0) {
-    lines.push(`注意：筹码${c.diff > 0 ? '多了 ' : '少了 '}${trimNum(Math.abs(c.diff))} 积分`);
-  }
+  lines.push('', t.sumTotal(c.totalHands, trimNum(c.bank), trimNum(c.totalPay)));
+  if (c.allFilled && c.diff !== 0) lines.push(t.sumDiff(c.diff, trimNum(Math.abs(c.diff))));
   return lines.join('\n');
 }
 
