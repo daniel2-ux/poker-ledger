@@ -185,7 +185,7 @@ function Setup({ S, setS, pal, dark }) {
   return (
     <Rise className="panel">
       <h2>开新局</h2>
-      <div className="muted"><Rate o={S.settings} />，每人开局自动记 1 手。</div>
+      <div className="muted"><Rate o={S.settings} />，每人开局自动记 1 手。只发牌的 Dealer 也选上，开局后点「−1」减到 0 手。</div>
       {S.roster.length ? (
         <>
           <div className="muted">点名字选今天上桌的人</div>
@@ -226,7 +226,7 @@ function Play({ S, setS, pal, dark }) {
   const c = calc(cur);
   const upPlayers = fn => setS(s => ({ ...s, current: { ...s.current, players: fn(s.current.players) } }));
   const bump = (name, d) =>
-    upPlayers(ps => ps.map(p => (p.name === name ? { ...p, hands: Math.max(1, p.hands + d) } : p)));
+    upPlayers(ps => ps.map(p => (p.name === name ? { ...p, hands: Math.max(0, p.hands + d) } : p)));
   const join = name => {
     if (cur.players.some(p => p.name === name)) return false;
     setS(s => ({
@@ -274,6 +274,8 @@ function Play({ S, setS, pal, dark }) {
                   <div className="muted num">
                     已离场 · 带走 {trimNum(p.final)} · 净 <span className={cls(p.final - p.hands * cur.handPoints)}>{signed(p.final - p.hands * cur.handPoints)}</span>
                   </div>
+                ) : p.hands === 0 ? (
+                  <div className="muted">Dealer · 只发牌，不买入</div>
                 ) : null}
               </div>
               <div className="hands">
@@ -314,7 +316,7 @@ function Play({ S, setS, pal, dark }) {
                 <button type="button" className="btn ghost minus" aria-label={`${p.name} 提前离场`} onClick={() => setCash({ name: p.name, draft: '' })}>
                   离场
                 </button>
-                {p.hands <= 1 ? (
+                {p.hands <= 0 ? (
                   <Confirm
                     label="移除"
                     armedLabel="确认移除"
@@ -410,7 +412,7 @@ function Settle({ S, setS, onSave, pal, dark }) {
           <Rise key={r.name} i={i} className="srow">
             <div>
               <div className="name">{r.name}</div>
-              <div className="muted num">买 {r.hands} 手 · ¥{trimNum(r.buyMoney)}{cur.players[i].left ? ' · 已离场' : ''}</div>
+              <div className="muted num">{r.hands === 0 ? 'Dealer · 不买入' : <>买 {r.hands} 手 · ¥{trimNum(r.buyMoney)}</>}{cur.players[i].left ? ' · 已离场' : ''}</div>
             </div>
             <div>
               <input
@@ -496,7 +498,7 @@ function GameEditor({ g, onSave, onCancel }) {
     hands: r.hands.trim() === '' ? NaN : Number(r.hands),
     final: r.final.trim() === '' ? NaN : Math.round(Number(r.final))
   }));
-  const ok = parsed.every(p => Number.isInteger(p.hands) && p.hands >= 1 && isFinite(p.final) && p.final >= 0);
+  const ok = parsed.every(p => Number.isInteger(p.hands) && p.hands >= 0 && isFinite(p.final) && p.final >= 0);
   const c = ok ? calc({ ...g, players: parsed }) : null;
   return (
     <>
@@ -511,7 +513,7 @@ function GameEditor({ g, onSave, onCancel }) {
               return (
                 <tr key={r.name}>
                   <td>{r.name}</td>
-                  <td><input type="number" inputMode="numeric" min="1" step="1" aria-label={`${r.name} 买入手数`} value={r.hands} onChange={e => set(i, 'hands', e.target.value)} /></td>
+                  <td><input type="number" inputMode="numeric" min="0" step="1" aria-label={`${r.name} 买入手数`} value={r.hands} onChange={e => set(i, 'hands', e.target.value)} /></td>
                   <td><input type="number" inputMode="numeric" min="0" step="1" aria-label={`${r.name} 最终积分`} value={r.final} onChange={e => set(i, 'final', e.target.value)} /></td>
                   <td className={'num ' + (row ? cls(row.netPts) : '')}>{row ? signed(row.netPts) : '—'}</td>
                 </tr>
@@ -521,7 +523,7 @@ function GameEditor({ g, onSave, onCancel }) {
         </table>
       </div>
       {!ok ? (
-        <div className="banner wait" role="status">手数要是不小于 1 的整数，最终积分不能空着</div>
+        <div className="banner wait" role="status">手数要是整数（只发牌的 Dealer 填 0），最终积分不能空着</div>
       ) : c.diff === 0 ? (
         <div className="banner ok" role="status">对上了：最终积分合计 {trimNum(c.totalFinal)}，等于总买入</div>
       ) : (
