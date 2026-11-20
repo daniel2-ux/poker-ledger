@@ -14,7 +14,7 @@ A scoreboard for home Texas Hold'em nights. Track everyone's buy-ins during the 
 - **Early leavers**: record someone's chips when they leave, so they are already filled in at the end.
 - **Dealer**: a dealer who only deals sits at 0 buy-ins and still gets paid for the tips they collect.
 - **History**: every game is kept, with a running leaderboard. Saved games can be edited.
-- **Settings**: chips per buy-in and money per buy-in are adjustable (default 1,000 chips = ¥200).
+- **Settings**: chips per buy-in, money per buy-in and the currency symbol (¥ $ € £ or your own) are adjustable.
 - **Share**: copy the settlement as text for your group chat.
 - **中文 / English**: switch with one tap.
 
@@ -46,3 +46,7 @@ npm run build    # static files in dist/, host them anywhere
 ```
 
 Built with React, Vite, [Motion](https://motion.dev) and components from [React Bits](https://reactbits.dev).
+
+## License
+
+[MIT](LICENSE)

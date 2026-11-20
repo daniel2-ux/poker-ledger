@@ -4,7 +4,7 @@ import { L } from './i18n.js';
 
 export const LS_KEY = 'poker-ledger-v1';
 
-export const DEFAULT_STATE = { settings: { handPoints: 1000, handMoney: 200 }, roster: [], current: null };
+export const DEFAULT_STATE = { settings: { handPoints: 1000, handMoney: 200, currency: '¥' }, roster: [], current: null };
 
 export const clone = o => JSON.parse(JSON.stringify(o));
 export const round2 = n => Math.round(n * 100) / 100;
@@ -25,7 +25,8 @@ export function norm(d) {
   return {
     settings: {
       handPoints: +st.handPoints > 0 ? +st.handPoints : 1000,
-      handMoney: +st.handMoney > 0 ? +st.handMoney : 200
+      handMoney: +st.handMoney > 0 ? +st.handMoney : 200,
+      currency: typeof st.currency === 'string' && st.currency.trim() ? st.currency.trim().slice(0, 4) : '¥'
     },
     roster: Array.isArray(d.roster) ? d.roster.map(String) : [],
     current: d.current && Array.isArray(d.current.players) ? clone(d.current) : null

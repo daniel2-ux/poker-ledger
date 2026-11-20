@@ -61,6 +61,7 @@ textarea { min-height: 120px; font-size: 13px; font-family: ui-monospace, Menlo,
   background: var(--sunk); border: 1.5px solid transparent; font-weight: 600;
 }
 .chip.on { background: var(--accent-soft); border-color: var(--accent); }
+.chips input.cur-other { width: 140px; border-radius: 999px; text-align: center; }
 .chip .x { color: var(--muted); margin-left: 6px; }
 .btn.armed.chip, .chips .btn.armed { border-radius: 999px; }
 

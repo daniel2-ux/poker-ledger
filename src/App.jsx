@@ -10,7 +10,7 @@ import Starfield from './Starfield.jsx';
 import {
   byNet, calc, cls, fmtDate, loadLocal, newId, norm, round2, saveLocal, signed, sortGames, summaryText, trimNum, validGame
 } from './lib.js';
-import { L, getLang, setLang } from './i18n.js';
+import { L, getLang, setLang, setCurrency } from './i18n.js';
 
 const TABS = ['game', 'history', 'config'];
 
@@ -224,6 +224,7 @@ function Setup({ S, setS, pal, dark }) {
 
 function Play({ S, setS, pal, dark }) {
   const t = L();
+  const sym = S.settings.currency;
   const cur = S.current;
   const c = calc(cur);
   const upPlayers = fn => setS(s => ({ ...s, current: { ...s.current, players: fn(s.current.players) } }));
@@ -255,7 +256,7 @@ function Play({ S, setS, pal, dark }) {
       <section className="totals">
         <Rise i={0} className="total"><b><Num value={c.totalHands} /></b><span>{t.totHands}</span></Rise>
         <Rise i={1} className="total"><b><Num value={c.totalBuyPts} /></b><span>{t.totPts}</span></Rise>
-        <Rise i={2} className="total"><b><Num value={c.bank} prefix="¥" /></b><span>{t.bankIn}</span></Rise>
+        <Rise i={2} className="total"><b><Num value={c.bank} prefix={sym} /></b><span>{t.bankIn}</span></Rise>
       </section>
       <div className="muted">{fmtDate(cur.startedAt)}{t.started}<Rate o={cur} /></div>
       <section className="players">
@@ -367,6 +368,7 @@ function Play({ S, setS, pal, dark }) {
 
 function Settle({ S, setS, onSave, pal, dark }) {
   const t = L();
+  const sym = S.settings.currency;
   const cur = S.current;
   const c = calc(cur);
   const { toast, text, copy } = useCopy();
@@ -436,7 +438,7 @@ function Settle({ S, setS, onSave, pal, dark }) {
             </div>
             <div className="cell pay">
               <div className="lab">{t.bankerPays}</div>
-              <div className="val">{r.filled ? <Num value={r.pay} prefix="¥" /> : '—'}</div>
+              <div className="val">{r.filled ? <Num value={r.pay} prefix={sym} /> : '—'}</div>
             </div>
             {top > 0 && r.netPts === top ? (
               <ElectricBorder className="zap" color={pal.gold} borderRadius={14} thickness={1.4} glow={0.7} interactive={false} />
@@ -461,7 +463,7 @@ function Settle({ S, setS, onSave, pal, dark }) {
   );
 }
 
-function GameTable({ g }) {
+function GameTable({ g, sym }) {
   const t = L();
   const c = calc(g);
   return (
@@ -479,7 +481,7 @@ function GameTable({ g }) {
                 <td className="num">{trimNum(r.final ?? 0)}</td>
                 <td className={'num ' + cls(r.netPts)}>{signed(r.netPts ?? 0)}</td>
                 <td className={'num ' + cls(r.netPts)}>{signed(r.netMoney ?? 0)}</td>
-                <td className="num">¥{trimNum(r.pay ?? 0)}</td>
+                <td className="num">{sym}{trimNum(r.pay ?? 0)}</td>
               </tr>
             ))}
           </tbody>
@@ -546,7 +548,7 @@ function GameEditor({ g, onSave, onCancel }) {
   );
 }
 
-function History({ G, setG, open, setOpen }) {
+function History({ G, setG, open, setOpen, sym }) {
   const t = L();
   const { toast, text, copy } = useCopy();
   const [editing, setEditing] = useState(null);
@@ -631,7 +633,7 @@ function History({ G, setG, open, setOpen }) {
                         />
                       ) : (
                       <>
-                      <GameTable g={g} />
+                      <GameTable g={g} sym={sym} />
                       <div className="row">
                         <button type="button" className="btn ghost" onClick={() => setEditing(g.id)}>{t.editData}</button>
                         <button type="button" className="btn ghost" onClick={() => copy(summaryText(g))}>{t.copySummary}</button>
@@ -727,6 +729,30 @@ function Config({ S, setS, G, setG }) {
           <SettingNumber id="set-money" label={t.moneyPer} value={S.settings.handMoney} onCommit={setSetting('handMoney')} decimal />
         </div>
         <div className="muted">{t.ratioHint}</div>
+        <h2>{t.currency}</h2>
+        <div className="chips">
+          {['¥', '$', '€', '£'].map(c => (
+            <button
+              key={c}
+              type="button"
+              className={'chip num' + (S.settings.currency === c ? ' on' : '')}
+              aria-pressed={S.settings.currency === c}
+              onClick={() => setS(s => ({ ...s, settings: { ...s.settings, currency: c } }))}
+            >
+              {c}
+            </button>
+          ))}
+          <input
+            className="cur-other"
+            type="text"
+            maxLength={4}
+            placeholder={t.currencyOther}
+            aria-label={t.currencyOther}
+            value={['¥', '$', '€', '£'].includes(S.settings.currency) ? '' : S.settings.currency}
+            onChange={e => setS(s => ({ ...s, settings: { ...s.settings, currency: e.target.value.trim() || '¥' } }))}
+          />
+        </div>
+        <div className="muted">{t.currencyHint}</div>
       </Rise>
       <Rise i={1} className="panel">
         <h2>{t.roster}</h2>
@@ -776,6 +802,7 @@ export default function App() {
   const [open, setOpen] = useState(null);
   const tab = useTab();
   const [lang, setLangState] = useState(getLang);
+  setCurrency(S.settings.currency); // before any string is built this render
   const t = L();
   useEffect(() => {
     document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
@@ -809,7 +836,7 @@ export default function App() {
 
   let screen;
   let screenKey = tab;
-  if (tab === 'history') screen = <History G={G} setG={setG} open={open} setOpen={setOpen} />;
+  if (tab === 'history') screen = <History G={G} setG={setG} open={open} setOpen={setOpen} sym={S.settings.currency} />;
   else if (tab === 'config') screen = <Config S={S} setS={setS} G={G} setG={setG} />;
   else if (!S.current) {
     screenKey = 'setup';

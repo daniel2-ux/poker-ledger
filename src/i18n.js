@@ -3,6 +3,16 @@
 
 const LANG_KEY = 'poker-ledger-lang';
 
+// Currency symbol, set from the settings on every render. With the default ¥ the Chinese
+// text keeps its natural "元" wording; any other symbol is shown as a prefix.
+let C = '¥';
+export const setCurrency = c => {
+  C = c || '¥';
+};
+const yuan = x => (C === '¥' ? `${x} 元` : `${C}${x}`);
+const unit = () => (C === '¥' ? '元' : C);
+const pre = s => s.replace(/^([+−]?)/, (m, sign) => sign + C);
+
 const over = d => (d > 0 ? 'over' : 'short');
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -16,8 +26,8 @@ const STR = {
     copied: '已复制，可以直接粘贴到群里',
     copyFail: '自动复制没成功，请长按下面的文字手动复制',
     confirmAgain: '再点一次确认',
-    rate: ['一手 ', ' 积分 = ', ' 元'],
-    money: s => `${s} 元`,
+    get rate() { return C === '¥' ? ['一手 ', ' 积分 = ', ' 元'] : ['一手 ', ` 积分 = ${C}`, '']; },
+    money: s => (C === '¥' ? `${s} 元` : pre(s)),
     newPlayer: '新玩家名字',
     summaryAria: '结算文字',
     newGame: '开新局',
@@ -52,12 +62,12 @@ const STR = {
     endSettle: '结束并结算',
     voidGame: '作废本局',
     waitBanner: (a, b) => `已填 ${a} / 总买入 ${b} 积分，还有人没填`,
-    okBanner: (a, b) => `对上了：最终积分合计 ${a}，等于总买入。Banker 共转出 ¥${b}`,
+    okBanner: (a, b) => `对上了：最终积分合计 ${a}，等于总买入。Banker 共转出 ${C}${b}`,
     badBanner: (d, abs, tot, buy, long) =>
       `对不上：筹码${d > 0 ? '多了 ' : '少了 '}${abs} 积分（合计 ${tot}，总买入 ${buy}）` + (long ? '。请重新数一下，或检查买入手数' : ''),
     settleTitle: '结算：填每个人最后的积分',
     dealerSettle: 'Dealer · 不买入',
-    buyLine: (h, m) => `买 ${h} 手 · ¥${m}`,
+    buyLine: (h, m) => `买 ${h} 手 · ${C}${m}`,
     leftTag: ' · 已离场',
     finalChips: '最终积分',
     finalAria: n => `${n} 最终积分`,
@@ -70,8 +80,8 @@ const STR = {
     keepPlaying: '返回继续打',
     thPlayer: '玩家',
     thHands: '买入手数',
-    thNetMoney: '净利润（元）',
-    tableFoot: (h, b, p) => ` · 共 ${h} 手 · Banker 收 ¥${b}，转出 ¥${p}`,
+    get thNetMoney() { return `净利润（${unit()}）`; },
+    tableFoot: (h, b, p) => ` · 共 ${h} 手 · Banker 收 ${C}${b}，转出 ${C}${p}`,
     diffShort: (d, abs) => ` · 筹码${d > 0 ? '多 ' : '少 '}${abs} 积分`,
     editInvalid: '手数要是整数（只发牌的 Dealer 填 0），最终积分不能空着',
     editOk: a => `对上了：最终积分合计 ${a}，等于总买入`,
@@ -79,7 +89,7 @@ const STR = {
     noGames: '还没有比赛记录。打完一局并保存结算后，会出现在这里，还会有每个人的累计输赢榜。',
     board: '累计输赢榜',
     thGames: '场数',
-    thTotalNet: '累计净利润（元）',
+    get thTotalNet() { return `累计净利润（${unit()}）`; },
     eachGame: '每场记录',
     gameHead: (n, h) => ` · ${n} 人 · ${h} 手`,
     editData: '修改数据',
@@ -91,8 +101,11 @@ const STR = {
     restored: n => `已恢复，共 ${n} 场记录`,
     badBackup: '这段文字不是有效的备份，没有改动任何数据',
     ratio: '换算比例',
+    currency: '货币符号',
+    currencyOther: '其他符号',
+    currencyHint: '只改变显示的符号，不换算金额。',
     ptsPer: '一手多少积分',
-    moneyPer: '一手多少元',
+    get moneyPer() { return C === '¥' ? '一手多少元' : `一手多少钱（${C}）`; },
     ratioHint: '修改后只影响之后新开的比赛。进行中的这一局和历史记录保持当时的比例。',
     roster: '常用玩家',
     rosterHint: '点名字两次可从名单里删除，不影响历史记录',
@@ -105,10 +118,10 @@ const STR = {
     backupPh: '导出的数据会出现在这里；要恢复时把备份文字粘贴到这里',
     overwrite: '用框里的数据覆盖现有数据',
     sumTitle: '德州结算 ',
-    sumRate: (p, m) => `一手 ${p} 积分 = ${m} 元`,
+    sumRate: (p, m) => `一手 ${p} 积分 = ${yuan(m)}`,
     sumRow: (name, h, fin) => `${name}：买 ${h} 手，剩 ${fin}`,
-    sumRowNet: (net, netMoney, pay) => `，净 ${net}（${netMoney} 元），Banker 转 ${pay} 元`,
-    sumTotal: (h, bank, pay) => `总买入 ${h} 手，Banker 共收 ${bank} 元，共转出 ${pay} 元`,
+    sumRowNet: (net, netMoney, pay) => `，净 ${net}（${C === '¥' ? netMoney + ' 元' : pre(netMoney)}），Banker 转 ${yuan(pay)}`,
+    sumTotal: (h, bank, pay) => `总买入 ${h} 手，Banker 共收 ${yuan(bank)}，共转出 ${yuan(pay)}`,
     sumDiff: (d, abs) => `注意：筹码${d > 0 ? '多了 ' : '少了 '}${abs} 积分`
   },
   en: {
@@ -120,8 +133,8 @@ const STR = {
     copied: 'Copied — paste it into your group chat',
     copyFail: 'Could not copy automatically; long-press the text below to copy it',
     confirmAgain: 'Tap again to confirm',
-    rate: ['1 buy-in = ', ' chips = ¥', ''],
-    money: s => s.replace(/^([+−]?)/, '$1¥'),
+    get rate() { return ['1 buy-in = ', ` chips = ${C}`, '']; },
+    money: s => pre(s),
     newPlayer: 'New player name',
     summaryAria: 'Settlement text',
     newGame: 'New game',
@@ -156,12 +169,12 @@ const STR = {
     endSettle: 'End & settle',
     voidGame: 'Discard game',
     waitBanner: (a, b) => `Entered ${a} of ${b} chips bought in; some players are still missing`,
-    okBanner: (a, b) => `Balanced: final chips total ${a}, equal to the total buy-in. Banker pays out ¥${b}`,
+    okBanner: (a, b) => `Balanced: final chips total ${a}, equal to the total buy-in. Banker pays out ${C}${b}`,
     badBanner: (d, abs, tot, buy, long) =>
       `Off by ${abs} chips ${over(d)} (total ${tot}, bought in ${buy})` + (long ? '. Recount, or check the buy-ins' : ''),
     settleTitle: "Settle: enter everyone's final chips",
     dealerSettle: 'Dealer · no buy-in',
-    buyLine: (h, m) => `${plural(h, 'buy-in')} · ¥${m}`,
+    buyLine: (h, m) => `${plural(h, 'buy-in')} · ${C}${m}`,
     leftTag: ' · left',
     finalChips: 'Final chips',
     finalAria: n => `${n} final chips`,
@@ -174,8 +187,8 @@ const STR = {
     keepPlaying: 'Back to game',
     thPlayer: 'Player',
     thHands: 'Buy-ins',
-    thNetMoney: 'Net (¥)',
-    tableFoot: (h, b, p) => ` · ${plural(h, 'buy-in')} · Banker in ¥${b}, out ¥${p}`,
+    get thNetMoney() { return `Net (${C})`; },
+    tableFoot: (h, b, p) => ` · ${plural(h, 'buy-in')} · Banker in ${C}${b}, out ${C}${p}`,
     diffShort: (d, abs) => ` · ${abs} chips ${over(d)}`,
     editInvalid: 'Buy-ins must be a whole number (0 for a dealer who only deals), and final chips cannot be empty',
     editOk: a => `Balanced: final chips total ${a}, equal to the total buy-in`,
@@ -183,7 +196,7 @@ const STR = {
     noGames: 'No games yet. Finish a game and save the settlement; it will show up here along with a running leaderboard.',
     board: 'Leaderboard',
     thGames: 'Games',
-    thTotalNet: 'Total net (¥)',
+    get thTotalNet() { return `Total net (${C})`; },
     eachGame: 'Games',
     gameHead: (n, h) => ` · ${plural(n, 'player')} · ${plural(h, 'buy-in')}`,
     editData: 'Edit',
@@ -195,8 +208,11 @@ const STR = {
     restored: n => `Restored, ${plural(n, 'game')}`,
     badBackup: 'That text is not a valid backup; nothing was changed',
     ratio: 'Conversion rate',
+    currency: 'Currency symbol',
+    currencyOther: 'Other symbol',
+    currencyHint: 'Changes the symbol shown only; amounts are not converted.',
     ptsPer: 'Chips per buy-in',
-    moneyPer: 'Money per buy-in (¥)',
+    get moneyPer() { return `Money per buy-in (${C})`; },
     ratioHint: 'Changes apply only to games started afterwards. The game in progress and past games keep their own rate.',
     roster: 'Regular players',
     rosterHint: 'Tap a name twice to remove it from the list; history is not affected',
@@ -209,10 +225,10 @@ const STR = {
     backupPh: 'Exported data appears here; paste backup text here to restore',
     overwrite: 'Replace current data with the text in the box',
     sumTitle: 'Poker settlement ',
-    sumRate: (p, m) => `1 buy-in = ${p} chips = ¥${m}`,
+    sumRate: (p, m) => `1 buy-in = ${p} chips = ${C}${m}`,
     sumRow: (name, h, fin) => `${name}: ${plural(h, 'buy-in')}, ended with ${fin}`,
-    sumRowNet: (net, netMoney, pay) => `, net ${net} (${netMoney.replace(/^([+−]?)/, '$1¥')}), Banker pays ¥${pay}`,
-    sumTotal: (h, bank, pay) => `Total ${plural(h, 'buy-in')}; Banker collected ¥${bank}, pays out ¥${pay}`,
+    sumRowNet: (net, netMoney, pay) => `, net ${net} (${pre(netMoney)}), Banker pays ${C}${pay}`,
+    sumTotal: (h, bank, pay) => `Total ${plural(h, 'buy-in')}; Banker collected ${C}${bank}, pays out ${C}${pay}`,
     sumDiff: (d, abs) => `Note: chips are ${abs} ${over(d)}`
   }
 };
